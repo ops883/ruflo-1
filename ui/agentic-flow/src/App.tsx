@@ -5,21 +5,31 @@ import { motion } from 'framer-motion'
 
 // Components (to be implemented)
 import Dashboard from './components/dashboard/Dashboard'
-import SwarmView from './components/swarm/SwarmView'
+import SwarmViewEnhanced from './components/swarm/SwarmViewEnhanced'
 import MCPTools from './components/mcp/MCPTools'
 import Terminal from './components/shared/Terminal'
 import Navigation from './components/shared/Navigation'
-import MemoryExplorer from './components/memory/MemoryExplorer'
+import MemoryExplorerV2 from './components/memory/MemoryExplorerV2'
 
-// Stores (to be implemented)
+// Stores
 import { useSwarmStore } from './stores/swarmStore'
 import { useMCPStore } from './stores/mcpStore'
+import useRealTimeStore from './stores/realTimeStore'
+import useRealTimeSync from './hooks/useRealTimeSync'
 
 // Utils
 import { cn } from './utils/cn'
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false)
+  
+  // Real-time sync state
+  const { connected, agents, swarms, performance } = useRealTimeStore()
+  const { connecting, error } = useRealTimeSync({ 
+    autoConnect: true,
+    reconnectInterval: 3000,
+    maxReconnectAttempts: 10
+  })
 
   useEffect(() => {
     // Simulate initialization
@@ -57,35 +67,41 @@ function App() {
             <main className="main-view">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/swarm" element={<SwarmView />} />
+                <Route path="/swarm" element={<SwarmViewEnhanced />} />
                 <Route path="/mcp-tools" element={<MCPTools />} />
-                <Route path="/memory" element={<MemoryExplorer />} />
+                <Route path="/memory" element={<MemoryExplorerV2 />} />
                 <Route path="/terminal" element={<Terminal />} />
               </Routes>
             </main>
           </div>
 
-          {/* Status bar */}
+          {/* Status bar - Real-time data */}
           <div className="status-bar">
             <div className="status-item">
+              <span className="status-label">SYNC:</span>
+              <span className={`status-value ${connected ? 'status-active' : 'status-error'}`}>
+                {connected ? 'LIVE' : connecting ? 'CONNECTING' : 'OFFLINE'}
+              </span>
+            </div>
+            <div className="status-item">
               <span className="status-label">SWARM:</span>
-              <span className="status-value status-active">ACTIVE</span>
+              <span className={`status-value ${swarms.some(s => s.status === 'active') ? 'status-active' : 'status-idle'}`}>
+                {swarms.some(s => s.status === 'active') ? 'ACTIVE' : 'IDLE'}
+              </span>
             </div>
             <div className="status-item">
               <span className="status-label">AGENTS:</span>
-              <span className="status-value">5/5</span>
-            </div>
-            <div className="status-item">
-              <span className="status-label">MCP:</span>
-              <span className="status-value">71 TOOLS</span>
+              <span className="status-value">
+                {agents.filter(a => a.status !== 'offline').length}/{agents.length || '0'}
+              </span>
             </div>
             <div className="status-item">
               <span className="status-label">MEMORY:</span>
-              <span className="status-value">87.3MB</span>
+              <span className="status-value">{performance.memory.toFixed(1)}MB</span>
             </div>
             <div className="status-item">
               <span className="status-label">CPU:</span>
-              <span className="status-value">23.4%</span>
+              <span className="status-value">{performance.cpu.toFixed(1)}%</span>
             </div>
             <div className="status-item status-time">
               {new Date().toLocaleTimeString('en-US', { hour12: false })}

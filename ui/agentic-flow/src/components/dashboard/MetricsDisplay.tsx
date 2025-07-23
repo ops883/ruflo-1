@@ -12,15 +12,24 @@ interface Metrics {
 
 interface MetricsDisplayProps {
   metrics: Metrics
+  realTime?: boolean
 }
 
-const MetricsDisplay: React.FC<MetricsDisplayProps> = ({ metrics }) => {
+const MetricsDisplay: React.FC<MetricsDisplayProps> = ({ metrics, realTime = false }) => {
   const cpuColor = metrics.cpu > 80 ? 'text-red-400' : metrics.cpu > 50 ? 'text-yellow-400' : 'text-green-400'
   const memoryColor = metrics.memory > 400 ? 'text-red-400' : metrics.memory > 200 ? 'text-yellow-400' : 'text-green-400'
 
   return (
     <div className="retro-panel">
-      <h2 className="text-lg font-semibold mb-4 text-green-400">SYSTEM METRICS</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-green-400">SYSTEM METRICS</h2>
+        {realTime && (
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="text-xs text-green-400">LIVE</span>
+          </div>
+        )}
+      </div>
       
       {/* Performance Metrics */}
       <div className="space-y-3">

@@ -2,7 +2,41 @@
  * WebSocket Integration for Real-time Swarm Updates
  */
 
-import { EventEmitter } from 'events';
+// Browser-compatible EventEmitter
+class EventEmitter {
+  private events: Map<string, Array<(...args: any[]) => void>> = new Map();
+
+  on(event: string, listener: (...args: any[]) => void): this {
+    if (!this.events.has(event)) {
+      this.events.set(event, []);
+    }
+    this.events.get(event)!.push(listener);
+    return this;
+  }
+
+  emit(event: string, ...args: any[]): boolean {
+    if (!this.events.has(event)) return false;
+    this.events.get(event)!.forEach(listener => listener(...args));
+    return true;
+  }
+
+  off(event: string, listener: (...args: any[]) => void): this {
+    if (!this.events.has(event)) return this;
+    const listeners = this.events.get(event)!;
+    const index = listeners.indexOf(listener);
+    if (index > -1) listeners.splice(index, 1);
+    return this;
+  }
+
+  removeAllListeners(event?: string): this {
+    if (event) {
+      this.events.delete(event);
+    } else {
+      this.events.clear();
+    }
+    return this;
+  }
+}
 import { getHiveMindClient, HiveMindClient } from './hive-client';
 
 export interface WebSocketConfig {
@@ -65,7 +99,7 @@ export class SwarmWebSocket extends EventEmitter {
     
     this.config = {
       url: config.url || 'localhost',
-      port: config.port || 3006,
+      port: config.port || 3001, // Changed to match our backend server
       autoConnect: config.autoConnect !== false,
       reconnectInterval: config.reconnectInterval || 5000,
       maxReconnectAttempts: config.maxReconnectAttempts || 10

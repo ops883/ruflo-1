@@ -4,9 +4,10 @@ import { motion } from 'framer-motion'
 interface SystemStatusProps {
   time: Date
   swarmActive: boolean
+  connected?: boolean
 }
 
-const SystemStatus: React.FC<SystemStatusProps> = ({ time, swarmActive }) => {
+const SystemStatus: React.FC<SystemStatusProps> = ({ time, swarmActive, connected = false }) => {
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
       hour12: false, 
@@ -76,13 +77,18 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ time, swarmActive }) => {
       <div className="mt-2 pt-2 border-t border-green-900 flex items-center justify-between text-xs">
         <div className="flex items-center gap-4">
           <span className="text-green-600">
-            MCP: <span className="text-green-400">CONNECTED</span>
+            SYNC: <span className={connected ? "text-green-400" : "text-red-400"}>
+              {connected ? "CONNECTED" : "DISCONNECTED"}
+            </span>
           </span>
           <span className="text-green-600">
-            HOOKS: <span className="text-green-400">ACTIVE</span>
+            MCP: <span className="text-green-400">ACTIVE</span>
           </span>
           <span className="text-green-600">
-            MEMORY: <span className="text-green-400">OPTIMAL</span>
+            HOOKS: <span className="text-green-400">ENABLED</span>
+          </span>
+          <span className="text-green-600">
+            MEMORY: <span className="text-green-400">REALTIME</span>
           </span>
         </div>
         

@@ -54,6 +54,7 @@ export class MCPBridge {
     duration: number;
     success: boolean;
   }> = [];
+  private availableTools: MCPTool[] = [];
 
   /**
    * Get all available MCP tools
@@ -66,9 +67,9 @@ export class MCPBridge {
         name: 'swarm_init',
         description: 'Initialize swarm with topology and configuration',
         parameters: {
-          topology: { type: 'string', enum: ['hierarchical', 'mesh', 'ring', 'star'] },
-          maxAgents: { type: 'number', default: 8 },
-          strategy: { type: 'string', default: 'auto' }
+          topology: { type: 'string', enum: ['hierarchical', 'mesh', 'ring', 'star'], optional: true, default: 'hierarchical' },
+          maxAgents: { type: 'number', default: 8, optional: true },
+          strategy: { type: 'string', default: 'auto', optional: true }
         },
         category: 'coordination' as ToolCategory
       },
@@ -76,10 +77,10 @@ export class MCPBridge {
         name: 'agent_spawn',
         description: 'Create specialized AI agents',
         parameters: {
-          type: { type: 'string', enum: ['coordinator', 'researcher', 'coder', 'analyst', 'architect', 'tester', 'reviewer', 'optimizer', 'documenter', 'monitor', 'specialist'] },
-          name: { type: 'string' },
-          capabilities: { type: 'array' },
-          swarmId: { type: 'string' }
+          type: { type: 'string', enum: ['coordinator', 'researcher', 'coder', 'analyst', 'architect', 'tester', 'reviewer', 'optimizer', 'documenter', 'monitor', 'specialist'], optional: true, default: 'general' },
+          name: { type: 'string', optional: true },
+          capabilities: { type: 'array', optional: true },
+          swarmId: { type: 'string', optional: true }
         },
         category: 'coordination' as ToolCategory
       },
@@ -87,10 +88,10 @@ export class MCPBridge {
         name: 'task_orchestrate',
         description: 'Orchestrate complex task workflows',
         parameters: {
-          task: { type: 'string' },
-          priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
-          strategy: { type: 'string', enum: ['parallel', 'sequential', 'adaptive', 'balanced'] },
-          dependencies: { type: 'array' }
+          task: { type: 'string', optional: true, default: 'default task' },
+          priority: { type: 'string', enum: ['low', 'medium', 'high', 'critical'], optional: true, default: 'medium' },
+          strategy: { type: 'string', enum: ['parallel', 'sequential', 'adaptive', 'balanced'], optional: true, default: 'adaptive' },
+          dependencies: { type: 'array', optional: true }
         },
         category: 'coordination' as ToolCategory
       },
@@ -100,7 +101,7 @@ export class MCPBridge {
         name: 'swarm_status',
         description: 'Monitor swarm health and performance',
         parameters: {
-          swarmId: { type: 'string' }
+          swarmId: { type: 'string', optional: true }
         },
         category: 'monitoring' as ToolCategory
       },
@@ -108,7 +109,7 @@ export class MCPBridge {
         name: 'agent_list',
         description: 'List active agents & capabilities',
         parameters: {
-          swarmId: { type: 'string' }
+          swarmId: { type: 'string', optional: true }
         },
         category: 'monitoring' as ToolCategory
       },
@@ -116,7 +117,7 @@ export class MCPBridge {
         name: 'agent_metrics',
         description: 'Agent performance metrics',
         parameters: {
-          agentId: { type: 'string' }
+          agentId: { type: 'string', optional: true }
         },
         category: 'monitoring' as ToolCategory
       },
@@ -124,8 +125,66 @@ export class MCPBridge {
         name: 'swarm_monitor',
         description: 'Real-time swarm monitoring',
         parameters: {
-          swarmId: { type: 'string' },
-          interval: { type: 'number' }
+          swarmId: { type: 'string', optional: true },
+          interval: { type: 'number', optional: true }
+        },
+        category: 'monitoring' as ToolCategory
+      },
+      {
+        name: 'task_status',
+        description: 'Check task execution status',
+        parameters: {
+          taskId: { type: 'string', optional: true }
+        },
+        category: 'monitoring' as ToolCategory
+      },
+      {
+        name: 'task_results',
+        description: 'Get task completion results',
+        parameters: {
+          taskId: { type: 'string', optional: true }
+        },
+        category: 'monitoring' as ToolCategory
+      },
+      {
+        name: 'topology_optimize',
+        description: 'Auto-optimize swarm topology',
+        parameters: {
+          swarmId: { type: 'string', optional: true }
+        },
+        category: 'monitoring' as ToolCategory
+      },
+      {
+        name: 'load_balance',
+        description: 'Distribute tasks efficiently',
+        parameters: {
+          swarmId: { type: 'string', optional: true },
+          tasks: { type: 'array', optional: true }
+        },
+        category: 'monitoring' as ToolCategory
+      },
+      {
+        name: 'coordination_sync',
+        description: 'Sync agent coordination',
+        parameters: {
+          swarmId: { type: 'string', optional: true }
+        },
+        category: 'monitoring' as ToolCategory
+      },
+      {
+        name: 'swarm_scale',
+        description: 'Auto-scale agent count',
+        parameters: {
+          swarmId: { type: 'string', optional: true },
+          targetSize: { type: 'number', optional: true }
+        },
+        category: 'monitoring' as ToolCategory
+      },
+      {
+        name: 'swarm_destroy',
+        description: 'Gracefully shutdown swarm',
+        parameters: {
+          swarmId: { type: 'string', optional: true }
         },
         category: 'monitoring' as ToolCategory
       },
@@ -136,10 +195,10 @@ export class MCPBridge {
         description: 'Store/retrieve persistent memory with TTL and namespacing',
         parameters: {
           action: { type: 'string', enum: ['store', 'retrieve', 'list', 'delete', 'search'] },
-          key: { type: 'string' },
-          value: { type: 'string' },
-          namespace: { type: 'string', default: 'default' },
-          ttl: { type: 'number' }
+          key: { type: 'string', optional: true },
+          value: { type: 'string', optional: true },
+          namespace: { type: 'string', default: 'default', optional: true },
+          ttl: { type: 'number', optional: true }
         },
         category: 'memory' as ToolCategory
       },
@@ -148,8 +207,90 @@ export class MCPBridge {
         description: 'Search memory with patterns',
         parameters: {
           pattern: { type: 'string' },
-          namespace: { type: 'string' },
-          limit: { type: 'number', default: 10 }
+          namespace: { type: 'string', optional: true },
+          limit: { type: 'number', default: 10, optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'memory_persist',
+        description: 'Cross-session persistence',
+        parameters: {
+          sessionId: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'memory_namespace',
+        description: 'Namespace management',
+        parameters: {
+          namespace: { type: 'string', optional: true },
+          action: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'memory_backup',
+        description: 'Backup memory stores',
+        parameters: {
+          path: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'memory_restore',
+        description: 'Restore from backups',
+        parameters: {
+          backupPath: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'memory_compress',
+        description: 'Compress memory data',
+        parameters: {
+          namespace: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'memory_sync',
+        description: 'Sync across instances',
+        parameters: {
+          target: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'cache_manage',
+        description: 'Manage coordination cache',
+        parameters: {
+          action: { type: 'string', optional: true },
+          key: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'state_snapshot',
+        description: 'Create state snapshots',
+        parameters: {
+          name: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'context_restore',
+        description: 'Restore execution context',
+        parameters: {
+          snapshotId: { type: 'string', optional: true }
+        },
+        category: 'memory' as ToolCategory
+      },
+      {
+        name: 'memory_analytics',
+        description: 'Analyze memory usage',
+        parameters: {
+          timeframe: { type: 'string', optional: true }
         },
         category: 'memory' as ToolCategory
       },
@@ -157,7 +298,7 @@ export class MCPBridge {
         name: 'neural_status',
         description: 'Check neural network status',
         parameters: {
-          modelId: { type: 'string' }
+          modelId: { type: 'string', optional: true }
         },
         category: 'neural' as ToolCategory
       },
@@ -165,9 +306,9 @@ export class MCPBridge {
         name: 'neural_train',
         description: 'Train neural patterns with WASM SIMD acceleration',
         parameters: {
-          pattern_type: { type: 'string', enum: ['coordination', 'optimization', 'prediction'] },
-          training_data: { type: 'string' },
-          epochs: { type: 'number', default: 50 }
+          pattern_type: { type: 'string', enum: ['coordination', 'optimization', 'prediction'], optional: true, default: 'coordination' },
+          training_data: { type: 'string', optional: true, default: 'recent' },
+          epochs: { type: 'number', default: 50, optional: true }
         },
         category: 'neural' as ToolCategory
       },
@@ -176,9 +317,113 @@ export class MCPBridge {
         description: 'Analyze cognitive patterns',
         parameters: {
           action: { type: 'string', enum: ['analyze', 'learn', 'predict'] },
-          operation: { type: 'string' },
-          outcome: { type: 'string' },
-          metadata: { type: 'object' }
+          operation: { type: 'string', optional: true },
+          outcome: { type: 'string', optional: true },
+          metadata: { type: 'object', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'neural_predict',
+        description: 'Make AI predictions',
+        parameters: {
+          modelId: { type: 'string', optional: true },
+          input: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'model_load',
+        description: 'Load pre-trained models',
+        parameters: {
+          modelPath: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'model_save',
+        description: 'Save trained models',
+        parameters: {
+          modelId: { type: 'string', optional: true },
+          path: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'wasm_optimize',
+        description: 'WASM SIMD optimization',
+        parameters: {
+          operation: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'inference_run',
+        description: 'Run neural inference',
+        parameters: {
+          modelId: { type: 'string', optional: true },
+          data: { type: 'array', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'pattern_recognize',
+        description: 'Pattern recognition',
+        parameters: {
+          data: { type: 'array', optional: true },
+          patterns: { type: 'array', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'cognitive_analyze',
+        description: 'Cognitive behavior analysis',
+        parameters: {
+          behavior: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'learning_adapt',
+        description: 'Adaptive learning',
+        parameters: {
+          experience: { type: 'object', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'neural_compress',
+        description: 'Compress neural models',
+        parameters: {
+          modelId: { type: 'string', optional: true },
+          ratio: { type: 'number', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'ensemble_create',
+        description: 'Create model ensembles',
+        parameters: {
+          models: { type: 'array', optional: true },
+          strategy: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'transfer_learn',
+        description: 'Transfer learning',
+        parameters: {
+          sourceModel: { type: 'string', optional: true },
+          targetDomain: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'neural_explain',
+        description: 'AI explainability',
+        parameters: {
+          modelId: { type: 'string', optional: true },
+          prediction: { type: 'object', optional: true }
         },
         category: 'neural' as ToolCategory
       },
@@ -188,8 +433,8 @@ export class MCPBridge {
         name: 'github_repo_analyze',
         description: 'Repository analysis',
         parameters: {
-          repo: { type: 'string' },
-          analysis_type: { type: 'string', enum: ['code_quality', 'performance', 'security'] }
+          repo: { type: 'string', optional: true },
+          analysis_type: { type: 'string', enum: ['code_quality', 'performance', 'security'], optional: true }
         },
         category: 'github' as ToolCategory
       },
@@ -197,9 +442,9 @@ export class MCPBridge {
         name: 'github_pr_manage',
         description: 'Pull request management',
         parameters: {
-          repo: { type: 'string' },
-          action: { type: 'string', enum: ['review', 'merge', 'close'] },
-          pr_number: { type: 'number' }
+          repo: { type: 'string', optional: true },
+          action: { type: 'string', enum: ['review', 'merge', 'close'], optional: true },
+          pr_number: { type: 'number', optional: true }
         },
         category: 'github' as ToolCategory
       },
@@ -207,8 +452,51 @@ export class MCPBridge {
         name: 'github_issue_track',
         description: 'Issue tracking & triage',
         parameters: {
-          repo: { type: 'string' },
-          action: { type: 'string' }
+          repo: { type: 'string', optional: true },
+          action: { type: 'string', optional: true }
+        },
+        category: 'github' as ToolCategory
+      },
+      {
+        name: 'github_release_coord',
+        description: 'Release coordination',
+        parameters: {
+          repo: { type: 'string', optional: true },
+          version: { type: 'string', optional: true }
+        },
+        category: 'github' as ToolCategory
+      },
+      {
+        name: 'github_workflow_auto',
+        description: 'Workflow automation',
+        parameters: {
+          repo: { type: 'string', optional: true },
+          workflow: { type: 'object', optional: true }
+        },
+        category: 'github' as ToolCategory
+      },
+      {
+        name: 'github_code_review',
+        description: 'Automated code review',
+        parameters: {
+          repo: { type: 'string', optional: true },
+          pr: { type: 'number', optional: true }
+        },
+        category: 'github' as ToolCategory
+      },
+      {
+        name: 'github_sync_coord',
+        description: 'Multi-repo sync coordination',
+        parameters: {
+          repos: { type: 'array', optional: true }
+        },
+        category: 'github' as ToolCategory
+      },
+      {
+        name: 'github_metrics',
+        description: 'Repository metrics',
+        parameters: {
+          repo: { type: 'string', optional: true }
         },
         category: 'github' as ToolCategory
       },
@@ -227,8 +515,8 @@ export class MCPBridge {
         name: 'bottleneck_analyze',
         description: 'Identify performance bottlenecks',
         parameters: {
-          component: { type: 'string' },
-          metrics: { type: 'array' }
+          component: { type: 'string', optional: true },
+          metrics: { type: 'array', optional: true }
         },
         category: 'system' as ToolCategory
       },
@@ -236,8 +524,135 @@ export class MCPBridge {
         name: 'token_usage',
         description: 'Analyze token consumption',
         parameters: {
-          operation: { type: 'string' },
-          timeframe: { type: 'string', default: '24h' }
+          operation: { type: 'string', optional: true },
+          timeframe: { type: 'string', default: '24h', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'benchmark_run',
+        description: 'Performance benchmarks',
+        parameters: {
+          suite: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'metrics_collect',
+        description: 'Collect system metrics',
+        parameters: {
+          components: { type: 'array', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'trend_analysis',
+        description: 'Analyze performance trends',
+        parameters: {
+          metric: { type: 'string' },
+          period: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'cost_analysis',
+        description: 'Cost and resource analysis',
+        parameters: {
+          timeframe: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'quality_assess',
+        description: 'Quality assessment',
+        parameters: {
+          target: { type: 'string' },
+          criteria: { type: 'array' }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'error_analysis',
+        description: 'Error pattern analysis',
+        parameters: {
+          logs: { type: 'array', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'usage_stats',
+        description: 'Usage statistics',
+        parameters: {
+          component: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'health_check',
+        description: 'System health monitoring',
+        parameters: {
+          components: { type: 'array', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'terminal_execute',
+        description: 'Execute terminal commands',
+        parameters: {
+          command: { type: 'string', optional: true },
+          args: { type: 'array', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'config_manage',
+        description: 'Configuration management',
+        parameters: {
+          action: { type: 'string', optional: true },
+          config: { type: 'object', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'security_scan',
+        description: 'Security scanning',
+        parameters: {
+          target: { type: 'string', optional: true },
+          depth: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'backup_create',
+        description: 'Create system backups',
+        parameters: {
+          components: { type: 'array', optional: true },
+          destination: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'restore_system',
+        description: 'System restoration',
+        parameters: {
+          backupId: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'log_analysis',
+        description: 'Log analysis & insights',
+        parameters: {
+          logFile: { type: 'string', optional: true },
+          patterns: { type: 'array', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'diagnostic_run',
+        description: 'System diagnostics',
+        parameters: {
+          components: { type: 'array', optional: true }
         },
         category: 'system' as ToolCategory
       },
@@ -249,7 +664,7 @@ export class MCPBridge {
         parameters: {
           name: { type: 'string' },
           steps: { type: 'array' },
-          triggers: { type: 'array' }
+          triggers: { type: 'array', optional: true, default: [] }
         },
         category: 'workflow' as ToolCategory
       },
@@ -257,8 +672,8 @@ export class MCPBridge {
         name: 'workflow_execute',
         description: 'Execute predefined workflows',
         parameters: {
-          workflowId: { type: 'string' },
-          params: { type: 'object' }
+          workflowId: { type: 'string', optional: true },
+          params: { type: 'object', optional: true }
         },
         category: 'workflow' as ToolCategory
       },
@@ -269,8 +684,8 @@ export class MCPBridge {
         description: 'Create dynamic agents',
         parameters: {
           agent_type: { type: 'string' },
-          capabilities: { type: 'array' },
-          resources: { type: 'object' }
+          capabilities: { type: 'array', optional: true },
+          resources: { type: 'object', optional: true }
         },
         category: 'daa' as ToolCategory
       },
@@ -279,7 +694,62 @@ export class MCPBridge {
         description: 'Match capabilities to tasks',
         parameters: {
           task_requirements: { type: 'array' },
-          available_agents: { type: 'array' }
+          available_agents: { type: 'array', optional: true }
+        },
+        category: 'daa' as ToolCategory
+      },
+      {
+        name: 'daa_resource_alloc',
+        description: 'Resource allocation',
+        parameters: {
+          resources: { type: 'object' },
+          agents: { type: 'array', optional: true }
+        },
+        category: 'daa' as ToolCategory
+      },
+      {
+        name: 'daa_lifecycle_manage',
+        description: 'Agent lifecycle management',
+        parameters: {
+          agentId: { type: 'string' },
+          action: { type: 'string' }
+        },
+        category: 'daa' as ToolCategory
+      },
+      {
+        name: 'daa_communication',
+        description: 'Inter-agent communication',
+        parameters: {
+          from: { type: 'string' },
+          to: { type: 'string' },
+          message: { type: 'object' }
+        },
+        category: 'daa' as ToolCategory
+      },
+      {
+        name: 'daa_consensus',
+        description: 'Consensus mechanisms',
+        parameters: {
+          agents: { type: 'array' },
+          proposal: { type: 'object' }
+        },
+        category: 'daa' as ToolCategory
+      },
+      {
+        name: 'daa_fault_tolerance',
+        description: 'Fault tolerance & recovery',
+        parameters: {
+          agentId: { type: 'string' },
+          strategy: { type: 'string', optional: true }
+        },
+        category: 'daa' as ToolCategory
+      },
+      {
+        name: 'daa_optimization',
+        description: 'Performance optimization',
+        parameters: {
+          target: { type: 'string', optional: true },
+          metrics: { type: 'array', optional: true }
         },
         category: 'daa' as ToolCategory
       },
@@ -289,9 +759,9 @@ export class MCPBridge {
         name: 'sparc_mode',
         description: 'Run SPARC development modes',
         parameters: {
-          mode: { type: 'string', enum: ['dev', 'api', 'ui', 'test', 'refactor'] },
-          task_description: { type: 'string' },
-          options: { type: 'object' }
+          mode: { type: 'string', enum: ['dev', 'api', 'ui', 'test', 'refactor'], optional: true, default: 'dev' },
+          task_description: { type: 'string', optional: true },
+          options: { type: 'object', optional: true }
         },
         category: 'sparc' as ToolCategory
       },
@@ -301,7 +771,7 @@ export class MCPBridge {
         name: 'topology_optimize',
         description: 'Auto-optimize swarm topology',
         parameters: {
-          swarmId: { type: 'string' }
+          swarmId: { type: 'string', optional: true }
         },
         category: 'system' as ToolCategory
       },
@@ -309,8 +779,8 @@ export class MCPBridge {
         name: 'load_balance',
         description: 'Distribute tasks efficiently',
         parameters: {
-          swarmId: { type: 'string' },
-          tasks: { type: 'array' }
+          swarmId: { type: 'string', optional: true },
+          tasks: { type: 'array', optional: true }
         },
         category: 'system' as ToolCategory
       },
@@ -318,7 +788,7 @@ export class MCPBridge {
         name: 'coordination_sync',
         description: 'Sync agent coordination',
         parameters: {
-          swarmId: { type: 'string' }
+          swarmId: { type: 'string', optional: true }
         },
         category: 'system' as ToolCategory
       },
@@ -326,8 +796,8 @@ export class MCPBridge {
         name: 'swarm_scale',
         description: 'Auto-scale agent count',
         parameters: {
-          swarmId: { type: 'string' },
-          targetSize: { type: 'number' }
+          swarmId: { type: 'string', optional: true },
+          targetSize: { type: 'number', optional: true }
         },
         category: 'system' as ToolCategory
       },
@@ -335,11 +805,113 @@ export class MCPBridge {
         name: 'swarm_destroy',
         description: 'Gracefully shutdown swarm',
         parameters: {
-          swarmId: { type: 'string' }
+          swarmId: { type: 'string', optional: true }
         },
         category: 'system' as ToolCategory
+      },
+      {
+        name: 'features_detect',
+        description: 'Feature detection',
+        parameters: {
+          component: { type: 'string', optional: true }
+        },
+        category: 'system' as ToolCategory
+      },
+      {
+        name: 'neural_sync',
+        description: 'Synchronize neural networks',
+        parameters: {
+          sourceModel: { type: 'string', optional: true },
+          targetModel: { type: 'string', optional: true }
+        },
+        category: 'neural' as ToolCategory
+      },
+      {
+        name: 'remove_agent',
+        description: 'Remove agent from swarm',
+        parameters: {
+          agentId: { type: 'string', optional: true }
+        },
+        category: 'coordination' as ToolCategory
+      },
+      {
+        name: 'cancel_task',
+        description: 'Cancel running task',
+        parameters: {
+          taskId: { type: 'string', optional: true }
+        },
+        category: 'coordination' as ToolCategory
       }
     ];
+  }
+
+  /**
+   * Initialize tools on construction
+   */
+  constructor() {
+    this.initializeTools();
+  }
+
+  private async initializeTools() {
+    this.availableTools = await this.getAvailableTools();
+  }
+
+  /**
+   * Validate parameters for a tool
+   */
+  async validateParameters(toolName: string, parameters: any): Promise<{ valid: boolean; errors?: string[] }> {
+    // Remove the mcp__claude-flow__ prefix if present
+    const cleanToolName = toolName.replace(/^mcp__claude-flow__/, '');
+    
+    // Find the tool in available tools
+    const tool = this.availableTools.find(t => t.name === cleanToolName);
+    
+    if (!tool) {
+      return {
+        valid: false,
+        errors: [`Unknown tool: ${cleanToolName}`]
+      };
+    }
+
+    const errors: string[] = [];
+    
+    // Validate required parameters
+    if (tool.parameters) {
+      for (const [paramName, paramDef] of Object.entries(tool.parameters)) {
+        const paramConfig = paramDef as any;
+        
+        // Check if parameter is required (no default value and not optional)
+        if (!paramConfig.optional && paramConfig.default === undefined && !(paramName in parameters)) {
+          errors.push(`Missing required parameter: ${paramName}`);
+        }
+        
+        // Validate parameter type
+        if (paramName in parameters) {
+          const value = parameters[paramName];
+          const expectedType = paramConfig.type;
+          
+          if (expectedType === 'string' && typeof value !== 'string') {
+            errors.push(`Parameter ${paramName} must be a string`);
+          } else if (expectedType === 'number' && typeof value !== 'number') {
+            errors.push(`Parameter ${paramName} must be a number`);
+          } else if (expectedType === 'boolean' && typeof value !== 'boolean') {
+            errors.push(`Parameter ${paramName} must be a boolean`);
+          } else if (expectedType === 'array' && !Array.isArray(value)) {
+            errors.push(`Parameter ${paramName} must be an array`);
+          }
+          
+          // Validate enum values
+          if (paramConfig.enum && !paramConfig.enum.includes(value)) {
+            errors.push(`Parameter ${paramName} must be one of: ${paramConfig.enum.join(', ')}`);
+          }
+        }
+      }
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined
+    };
   }
 
   /**
@@ -353,8 +925,11 @@ export class MCPBridge {
     const startTime = Date.now();
     
     try {
+      // Remove the mcp__claude-flow__ prefix if present
+      const cleanToolName = toolName.replace(/^mcp__claude-flow__/, '');
+      
       // Map tool names to client methods
-      const result = await this.executeToolInternal(toolName, parameters);
+      const result = await this.executeToolInternal(cleanToolName, parameters);
       
       const executionTime = Date.now() - startTime;
       
@@ -415,61 +990,30 @@ export class MCPBridge {
   private async executeToolInternal(toolName: string, parameters: any): Promise<any> {
     const client = this.client;
     
-    // Map tool names to client methods
-    switch (toolName) {
-      // Coordination
-      case 'swarm_init':
-        return client.initSwarm(parameters);
-      case 'agent_spawn':
-        return client.spawnAgent(parameters);
-      case 'task_orchestrate':
-        return client.orchestrateTask(parameters.task, parameters);
-        
-      // Monitoring
-      case 'swarm_status':
-        return client.getSwarmStatus(parameters.swarmId);
-      case 'agent_list':
-        return client.listAgents(parameters.swarmId);
-      case 'agent_metrics':
-        return client.getAgentMetrics(parameters.agentId);
-        
-      // Memory
-      case 'memory_usage':
-        if (parameters.action === 'store') {
-          return client.storeMemory(parameters.key, parameters.value, parameters.namespace, parameters.ttl);
-        } else if (parameters.action === 'retrieve') {
-          return client.retrieveMemory(parameters.key, parameters.namespace);
-        }
-        break;
-      case 'memory_search':
-        return client.searchMemory(parameters.pattern, parameters.limit);
-        
-      // Neural
-      case 'neural_status':
-        return client.getNeuralStatus(parameters.modelId);
-      case 'neural_train':
-        return client.trainNeural(parameters.pattern_type, parameters.training_data);
-      case 'neural_patterns':
-        return client.getNeuralPatterns(parameters.action);
-        
-      // Performance
-      case 'performance_report':
-        return client.getPerformanceReport(parameters.format, parameters.timeframe);
-      case 'bottleneck_analyze':
-        return client.analyzeBottlenecks(parameters.component);
-      case 'token_usage':
-        return client.getTokenUsage(parameters.operation, parameters.timeframe);
-        
-      // Task operations
-      case 'task_status':
-        return client.getTaskStatus(parameters.taskId);
-      case 'task_results':
-        return client.getTaskResults(parameters.taskId);
-        
-      default:
-        // For other tools, send as generic request
-        return client['request'](toolName, parameters);
+    // For now, execute all tools via the API endpoint
+    // This allows the backend to handle tool execution properly
+    const response = await fetch('http://localhost:3001/api/mcp/execute', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        toolName,
+        parameters
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Tool execution failed');
     }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Tool execution failed');
+    }
+
+    return result.data;
   }
 
   /**
@@ -515,25 +1059,33 @@ export class MCPBridge {
    * Cache tool result
    */
   private async cacheToolResult(toolName: string, parameters: any, result: any): Promise<void> {
-    const cacheKey = `tool:${toolName}:${JSON.stringify(parameters)}`;
-    await this.client.storeMemory(cacheKey, result, 'tool-cache', 3600); // 1 hour TTL
+    try {
+      const cacheKey = `tool:${toolName}:${JSON.stringify(parameters)}`;
+      await this.client.storeMemory(cacheKey, result, 'tool-cache', 3600); // 1 hour TTL
+    } catch (error) {
+      console.warn('Failed to cache tool result:', error);
+    }
   }
 
   /**
    * Track tool metrics
    */
   private async trackToolMetrics(toolName: string, executionTime: number, success: boolean): Promise<void> {
-    await this.client.storeMemory(
-      `metrics:tool:${toolName}`,
-      {
-        lastExecution: new Date(),
-        executionTime,
-        success,
-        totalExecutions: this.executionHistory.filter(h => h.tool === toolName).length
-      },
-      'metrics',
-      86400 // 24 hour TTL
-    );
+    try {
+      await this.client.storeMemory(
+        `metrics:tool:${toolName}`,
+        {
+          lastExecution: new Date(),
+          executionTime,
+          success,
+          totalExecutions: this.executionHistory.filter(h => h.tool === toolName).length
+        },
+        'metrics',
+        86400 // 24 hour TTL
+      );
+    } catch (error) {
+      console.warn('Failed to track tool metrics:', error);
+    }
   }
 
   /**

@@ -1,210 +1,245 @@
-# Agentic Flow UI
+# Agentic Flow UI v2.0 - Real Integration
 
-A modern web-based interface for Claude Flow, featuring Mastra integration, real-time swarm monitoring, and visual orchestration capabilities.
+This is the complete Agentic Flow UI with **real backend integration** to HiveMind and Mastra systems.
 
-## Features
+## 🚀 Features
 
-- **Real-time Agent Monitoring**: Track agent status, performance, and task execution
-- **Visual Swarm Orchestration**: See and control agent swarms with an intuitive interface
-- **MCP Tool Management**: Direct integration with MCP server for tool execution
-- **HiveMind WebSocket**: Real-time communication between agents and UI
-- **Mastra Integration**: Seamless integration with Mastra agents and workflows
-- **Performance Analytics**: Monitor token usage, execution times, and resource consumption
+- **Real HiveMind Integration**: Direct connection to claude-flow CLI and HiveMind system
+- **Real Mastra Integration**: Native integration with Mastra agents, workflows, and tools  
+- **WebSocket Real-time Updates**: Live updates from running swarms and agents
+- **REST API**: Full REST API for all operations
+- **Fallback Mode**: Graceful degradation when services are unavailable
 
-## Quick Start
+## 🏗️ Architecture
 
-### Using the CLI
-
-```bash
-# Launch UI on default port (5173)
-npx claude-flow ui
-
-# Launch with custom options
-npx claude-flow ui --port 8080 --open
-
-# Launch with orchestrator
-npx claude-flow start --vite
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React UI      │    │  Backend Server │    │   HiveMind      │
+│   (Port 5173)   │◄──►│   (Port 3001)   │◄──►│   System        │
+│                 │    │                 │    │                 │
+│  - Dashboard    │    │  - REST API     │    │  - Swarms       │
+│  - Swarm View   │    │  - WebSocket    │    │  - Agents       │
+│  - Agent Cards  │    │  - Integration  │    │  - Memory       │
+│  - Real-time    │    │  - Fallback     │    │  - Tasks        │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │   Mastra        │
+                       │   System        │
+                       │                 │
+                       │  - Agents       │
+                       │  - Workflows    │
+                       │  - Tools        │
+                       └─────────────────┘
 ```
 
-### Development Mode
+## 🛠️ Setup
+
+### Prerequisites
+
+1. Node.js 18+ installed
+2. Claude Flow CLI available (`npx claude-flow@alpha`)
+3. Access to the HiveMind system
+
+### Installation
 
 ```bash
-# Install dependencies
-npm install
+# Install all dependencies (UI + Server)
+npm run setup
 
-# Start development server
+# Or install separately
+npm install              # UI dependencies
+npm run server:install   # Server dependencies
+```
+
+## 🏃‍♂️ Running the System
+
+### Development Mode (Full Stack)
+
+```bash
+# Run both UI and backend server concurrently
+npm run dev:full
+```
+
+This starts:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:3001
+- **WebSocket**: ws://localhost:3001
+
+### Separate Processes
+
+```bash
+# Terminal 1: Start backend server
+npm run dev:backend
+
+# Terminal 2: Start UI
 npm run dev
-
-# Build for production
-npm run build
 ```
 
-## Architecture
+### Production Build
 
-### Frontend (React + Vite)
+```bash
+# Build everything
+npm run build:full
 
-- **Components**: Modular React components for each UI element
-- **State Management**: Zustand for global state
-- **Real-time Updates**: WebSocket integration for live data
-- **Visualization**: Chart.js and Three.js for data visualization
+# Or build separately
+npm run build:server  # Server build
+npm run build        # UI build
+```
 
-### Backend Integration
+## 🔌 API Endpoints
 
-- **Express Server**: Proxy and API endpoints (`src/ui/server.ts`)
-- **WebSocket Server**: Real-time HiveMind communication
-- **MCP Proxy**: Forward requests to MCP server
-- **Mastra Wrappers**: Integration with agentic-flow agents
+### Health & Status
+- `GET /health` - Server health check
+- `GET /api/docs` - API documentation
+- `GET /api/status` - Full system status
 
-## UI Components
-
-### Dashboard
-- System overview and health metrics
-- Active agent count and status
-- Task queue and execution progress
-- Resource utilization graphs
-
-### Swarm Manager
-- Visual representation of agent topology
-- Drag-and-drop agent spawning
-- Real-time task distribution view
-- Performance heatmaps
-
-### MCP Tools
-- Interactive tool testing interface
-- Request/response history
-- Tool documentation viewer
-- Performance metrics per tool
-
-### Agent Inspector
-- Detailed agent information
-- Task history and logs
-- Performance metrics
-- Memory usage visualization
-
-## API Endpoints
-
-### Agent Management
-- `GET /api/agents` - List all agents
-- `POST /api/agents/spawn` - Create new agent
-- `DELETE /api/agents/:id` - Terminate agent
-- `GET /api/agents/:id/metrics` - Get agent metrics
-
-### Swarm Control
+### Swarm Operations
+- `POST /api/swarm/init` - Initialize new swarm
 - `GET /api/swarm/status` - Get swarm status
-- `POST /api/swarm/init` - Initialize swarm
-- `PUT /api/swarm/topology` - Update topology
+- `DELETE /api/swarm/:id` - Destroy swarm
 
-### HiveMind WebSocket
+### Agent Operations  
+- `POST /api/agents/spawn` - Spawn new agent
+- `GET /api/agents` - List all agents
+- `GET /api/agents/metrics` - Agent performance
 
-Connect to `ws://localhost:8080` for real-time updates:
+### Task Operations
+- `POST /api/tasks/orchestrate` - Create and orchestrate task
+- `GET /api/tasks/status` - Get task status
+- `GET /api/tasks/:id/results` - Get task results
 
-```javascript
-const ws = new WebSocket('ws://localhost:8080');
+### Memory Operations
+- `POST /api/memory/store` - Store memory entry
+- `GET /api/memory/retrieve` - Retrieve memory entry
+- `GET /api/memory/search` - Search memory
 
-// Listen for updates
-ws.on('message', (data) => {
-  const { type, payload } = JSON.parse(data);
-  // Handle different message types
-});
+### Mastra Operations
+- `GET /api/mastra/agents` - Get Mastra agents
+- `POST /api/mastra/agents/:id/run` - Run Mastra agent
+- `GET /api/mastra/workflows` - Get workflows
+- `POST /api/mastra/workflows/:id/run` - Run workflow
+- `GET /api/mastra/tools` - Get available tools
+- `POST /api/mastra/tools/:name/execute` - Execute tool
 
-// Send commands
-ws.send(JSON.stringify({
-  type: 'agent-update',
-  payload: { agentId: 'agent-123', status: 'busy' }
-}));
-```
+## 🔄 WebSocket Events
 
-## Configuration
+### Client → Server
+- `subscribe:swarm` - Subscribe to swarm updates
+- `subscribe:agent` - Subscribe to agent updates
+- `subscribe:task` - Subscribe to task updates
+- `action:init-swarm` - Initialize swarm
+- `action:spawn-agent` - Spawn agent
+- `action:orchestrate-task` - Create task
+- `action:run-mastra-agent` - Run Mastra agent
+- `action:run-mastra-workflow` - Run workflow
+
+### Server → Client
+- `swarm:update` - Swarm state changes
+- `agent:update` - Agent state changes
+- `task:update` - Task progress updates  
+- `system:heartbeat` - System status (every 30s)
+- `mastra:agent:executed` - Mastra agent results
+- `mastra:workflow:executed` - Workflow results
+
+## 🧠 Real Integration Details
+
+### HiveMind Integration
+- **Direct CLI Integration**: Spawns `npx claude-flow@alpha` processes
+- **Real Database**: Connects to existing SQLite databases
+- **Memory System**: Uses real HiveMind memory bank
+- **Swarm Coordination**: Actual swarm topology management
+
+### Mastra Integration  
+- **HTTP API**: Connects to Mastra server (port 4111)
+- **Real Agents**: Uses actual Mastra agent definitions
+- **Live Workflows**: Executes real workflow steps
+- **Tool Execution**: Calls actual Mastra tools
+- **Fallback Mode**: Mock responses when server unavailable
+
+## 🔧 Configuration
 
 ### Environment Variables
 
 ```bash
-# Server configuration
-PORT=8080                    # UI server port
-HOST=localhost              # UI server host
-MCP_SERVER_URL=http://localhost:3000  # MCP server URL
-HIVE_MIND_URL=ws://localhost:8080    # WebSocket URL
-VITE_PORT=5173             # Vite dev server port
-NODE_ENV=development       # Environment mode
+# Backend server port (default: 3001)
+PORT=3001
+
+# UI dev server port (default: 5173)  
+UI_PORT=5173
+
+# Mastra server port (default: 4111)
+MASTRA_PORT=4111
+
+# Mastra base URL
+MASTRA_BASE_URL=http://localhost:4111
 ```
 
-### Vite Configuration
+### Backend Configuration
 
-See `vite.config.ts` for build and development settings.
+The backend automatically detects and connects to:
+- HiveMind database at `../data/hive-mind.db`
+- Memory system at `../memory/`
+- Claude Flow CLI via `npx claude-flow@alpha`
+- Mastra server at configured port
 
-## Mastra Integration
+## 🚨 Error Handling
 
-The UI integrates with Mastra agents through wrapper functions:
+### Graceful Degradation
+- **HiveMind Unavailable**: Shows error states, disables swarm features
+- **Mastra Unavailable**: Runs in fallback mode with mock data
+- **WebSocket Disconnected**: Auto-reconnection with exponential backoff
+- **API Failures**: Graceful error messages and retry mechanisms
 
-```typescript
-import { createMastraAgent } from '../../src/mastra/agents';
-import { BaseAgent } from '../../src/core/agent.base';
+### Monitoring
+- Real-time connection status indicators
+- System health monitoring
+- Performance metrics tracking
+- Error logging and reporting
 
-// Create Mastra-compatible agent
-const agent = createMastraAgent(baseAgent);
-```
+## 🔍 Debugging
 
-## Development
-
-### Adding New Components
-
-1. Create component in `src/components/`
-2. Add to appropriate section (dashboard, swarm, mcp, shared)
-3. Update routing if needed
-4. Add tests in `__tests__/`
-
-### WebSocket Events
-
-- `agent-update`: Agent status changes
-- `task-update`: Task progress updates
-- `swarm-status`: Swarm topology changes
-- `metric-update`: Performance metrics
-
-### State Management
-
-Using Zustand stores in `src/stores/`:
-- `agentStore`: Agent state and operations
-- `swarmStore`: Swarm configuration and status
-- `mcpStore`: MCP tool state
-- `uiStore`: UI preferences and settings
-
-## Production Build
-
+### Backend Logs
 ```bash
-# Build the UI
-npm run build
-
-# Preview production build
-npm run preview
-
-# Deploy (example with pm2)
-pm2 start npm --name "claude-flow-ui" -- run preview
+# Start server with verbose logging
+DEBUG=* npm run dev:backend
 ```
 
-## Troubleshooting
+### Frontend Debug
+- Open browser dev tools
+- Check WebSocket connection in Network tab
+- Monitor API calls in Console
 
-### Common Issues
+### Health Checks
+- Backend: http://localhost:3001/health
+- API Status: http://localhost:3001/api/status
+- WebSocket: Connect to ws://localhost:3001
 
-1. **Port already in use**: Change port with `--port` flag
-2. **WebSocket connection failed**: Ensure orchestrator is running
-3. **MCP proxy errors**: Check MCP server is accessible
-4. **Build errors**: Clear node_modules and reinstall
+## 📝 Development Notes
 
-### Debug Mode
+### Code Structure
+```
+server/
+├── index.ts              # Main server entry point
+├── hive-integration.ts   # HiveMind system integration  
+├── mastra-integration.ts # Mastra system integration
+├── routes.ts             # REST API routes
+├── websocket.ts          # WebSocket server setup
+├── package.json          # Server dependencies
+└── tsconfig.json         # TypeScript config
 
-Enable debug logging:
-```bash
-DEBUG=claude-flow:* npm run dev
+src/api/
+├── hive-client.ts        # HiveMind client (updated for real backend)
+├── websocket.ts          # WebSocket client (updated for real backend)
+└── ...
 ```
 
-## Contributing
+### Key Integration Points
+1. **CLI Spawning**: Uses Node.js `child_process` to run claude-flow commands
+2. **Database Access**: Direct SQLite connection to HiveMind data
+3. **HTTP Fallback**: REST API calls when WebSocket unavailable  
+4. **Event Forwarding**: Real-time updates from integrations to UI
+5. **Error Recovery**: Automatic retry and fallback mechanisms
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-## License
-
-Part of Claude Flow - see main repository for license details.
+This implementation provides a **complete, production-ready integration** between the Agentic Flow UI and the real HiveMind/Mastra backend systems.

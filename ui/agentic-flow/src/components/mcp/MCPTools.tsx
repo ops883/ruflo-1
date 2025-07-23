@@ -1,29 +1,14 @@
-import React, { useState, useMemo } from 'react'
-import { Search, Terminal, Brain, Database, Activity, Workflow, Github, Settings, ChevronRight, Play, Copy, Check } from 'lucide-react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { Search, Terminal, Brain, Database, Activity, Workflow, Github, Settings, ChevronRight, Play, Copy, Check, AlertCircle, Loader } from 'lucide-react'
+import { MCPBridge, MCPTool, ToolExecutionResult } from '../../api/mcp-bridge'
 
-// Tool categories with their tools
+// Tool categories - empty initially, will be populated from API
 const toolCategories = {
   neural: {
     name: 'Neural Network Tools',
     icon: Brain,
     color: 'text-purple-400',
-    tools: [
-      { name: 'neural_status', description: 'Check neural network status', params: [] },
-      { name: 'neural_train', description: 'Train neural patterns', params: [{ name: 'pattern', type: 'string', required: true }] },
-      { name: 'neural_patterns', description: 'List available patterns', params: [] },
-      { name: 'neural_sync', description: 'Synchronize neural state', params: [] },
-      { name: 'pattern_learn', description: 'Learn from code patterns', params: [{ name: 'file', type: 'string' }] },
-      { name: 'neural_reset', description: 'Reset neural network', params: [] },
-      { name: 'neural_export', description: 'Export neural model', params: [{ name: 'format', type: 'string' }] },
-      { name: 'neural_import', description: 'Import neural model', params: [{ name: 'path', type: 'string' }] },
-      { name: 'neural_optimize', description: 'Optimize neural performance', params: [] },
-      { name: 'neural_benchmark', description: 'Benchmark neural operations', params: [] },
-      { name: 'neural_analyze', description: 'Analyze neural patterns', params: [{ name: 'depth', type: 'number' }] },
-      { name: 'neural_predict', description: 'Predict code patterns', params: [{ name: 'context', type: 'string' }] },
-      { name: 'neural_suggest', description: 'Get AI suggestions', params: [{ name: 'task', type: 'string' }] },
-      { name: 'neural_evaluate', description: 'Evaluate neural accuracy', params: [] },
-      { name: 'neural_visualize', description: 'Visualize neural network', params: [] }
-    ]
+    tools: [] // Will be populated from API
   },
   memory: {
     name: 'Memory & Persistence',
@@ -137,18 +122,112 @@ interface Tool {
 const MCPTools: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
+  const [selectedTool, setSelectedTool] = useState<MCPTool | null>(null)
   const [paramValues, setParamValues] = useState<Record<string, any>>({})
-  const [executionResult, setExecutionResult] = useState<string | null>(null)
+  const [executionResult, setExecutionResult] = useState<ToolExecutionResult | null>(null)
   const [copiedResult, setCopiedResult] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [realTools, setRealTools] = useState<MCPTool[]>([])
+  const [toolsLoaded, setToolsLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [executing, setExecuting] = useState(false)
+  
+  // Real MCP Bridge
+  const mcpBridge = new MCPBridge()
+  
+  // Load real MCP tools on component mount
+  useEffect(() => {
+    const loadTools = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const tools = await mcpBridge.getAvailableTools()
+        setRealTools(tools)
+        setToolsLoaded(true)
+        console.log(`Loaded ${tools.length} real MCP tools`, tools)
+        // Log tool names to debug
+        console.log('Tool names:', tools.map(t => t.name))
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load MCP tools')
+        console.error('Failed to load MCP tools:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadTools()
+  }, [])
+  
+  // Helper function to get category info
+  const getCategoryInfo = (category: string) => {
+    const categoryMap: Record<string, any> = {
+      coordination: { name: 'Swarm Coordination', icon: Terminal, color: 'text-red-400' },
+      monitoring: { name: 'Monitoring & Analysis', icon: Activity, color: 'text-green-400' },
+      memory: { name: 'Memory & Persistence', icon: Database, color: 'text-blue-400' },
+      neural: { name: 'Neural Network Tools', icon: Brain, color: 'text-purple-400' },
+      github: { name: 'GitHub Integration', icon: Github, color: 'text-orange-400' },
+      workflow: { name: 'Workflow & Automation', icon: Workflow, color: 'text-yellow-400' },
+      system: { name: 'System & Utilities', icon: Settings, color: 'text-cyan-400' },
+      daa: { name: 'Dynamic Agent Architecture', icon: Terminal, color: 'text-pink-400' },
+      sparc: { name: 'SPARC Development', icon: Terminal, color: 'text-indigo-400' }
+    }
+    return categoryMap[category] || { name: category, icon: Terminal, color: 'text-gray-400' }
+  }
+  
+  // Helper function to convert MCP parameters to component params
+  const convertParametersToParams = (parameters: any) => {
+    if (!parameters || !parameters.properties) return []
+    
+    return Object.entries(parameters.properties).map(([name, prop]: [string, any]) => ({
+      name,
+      type: prop.type === 'array' ? 'json' : prop.type,
+      required: parameters.required?.includes(name),
+      options: prop.enum
+    }))
+  }
+  
+  // Convert real tools to categories for display
+  const realToolCategories = useMemo(() => {
+    if (!toolsLoaded || realTools.length === 0) return toolCategories
+    
+    console.log('Building realToolCategories from', realTools.length, 'tools')
+    const categories: typeof toolCategories = {}
+    
+    // Group real tools by category
+    const toolsByCategory: Record<string, MCPTool[]> = {}
+    for (const tool of realTools) {
+      if (!toolsByCategory[tool.category]) {
+        toolsByCategory[tool.category] = []
+      }
+      toolsByCategory[tool.category].push(tool)
+    }
+    
+    // Map to category structure
+    for (const [category, tools] of Object.entries(toolsByCategory)) {
+      const categoryInfo = getCategoryInfo(category)
+      categories[category as keyof typeof toolCategories] = {
+        name: categoryInfo.name,
+        icon: categoryInfo.icon,
+        color: categoryInfo.color,
+        tools: tools.map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          params: convertParametersToParams(tool.parameters)
+        }))
+      }
+    }
+    
+    return categories
+  }, [realTools, toolsLoaded])
 
-  // Filter tools based on search
+  // Filter tools based on search (use real tools if available)
   const filteredCategories = useMemo(() => {
-    if (!searchQuery) return toolCategories
+    const categoriesToFilter = toolsLoaded ? realToolCategories : toolCategories
+    if (!searchQuery) return categoriesToFilter
 
     const filtered: typeof toolCategories = {}
     
-    Object.entries(toolCategories).forEach(([key, category]) => {
+    Object.entries(categoriesToFilter).forEach(([key, category]) => {
       const matchingTools = category.tools.filter(tool => 
         tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tool.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -163,62 +242,113 @@ const MCPTools: React.FC = () => {
     })
     
     return filtered
-  }, [searchQuery])
+  }, [searchQuery, toolsLoaded, realToolCategories])
 
   // Count total tools
-  const totalTools = Object.values(toolCategories).reduce((sum, cat) => sum + cat.tools.length, 0)
+  const categoriesToCount = toolsLoaded ? realToolCategories : toolCategories
+  const totalTools = Object.values(categoriesToCount).reduce((sum, cat) => sum + cat.tools.length, 0)
   const filteredToolsCount = Object.values(filteredCategories).reduce((sum, cat) => sum + cat.tools.length, 0)
 
-  const handleToolSelect = (tool: Tool, categoryKey: string) => {
-    setSelectedTool(tool)
+  const handleToolSelect = (tool: any, categoryKey: string) => {
+    // Find the real MCP tool
+    const realTool = realTools.find(t => t.name === tool.name)
+    if (realTool) {
+      // Add params property for the UI
+      setSelectedTool({
+        ...realTool,
+        params: convertParametersToParams(realTool.parameters)
+      } as any)
+    } else {
+      // Fallback to mock tool structure
+      setSelectedTool({
+        name: tool.name,
+        description: tool.description,
+        parameters: { properties: {}, required: [] },
+        params: tool.params || [],
+        category: categoryKey as any
+      } as any)
+    }
     setSelectedCategory(categoryKey)
     setParamValues({})
     setExecutionResult(null)
+    setError(null)
   }
 
   const handleParamChange = (paramName: string, value: any) => {
     setParamValues(prev => ({ ...prev, [paramName]: value }))
   }
 
-  const handleExecute = () => {
-    // Mock execution result
-    const mockResults = [
-      `✅ Successfully executed ${selectedTool?.name}`,
-      `📊 ${selectedTool?.name} completed with status: SUCCESS`,
-      `🔄 Processing ${selectedTool?.name}... Done!`,
-      `⚡ ${selectedTool?.name} executed in 0.${Math.floor(Math.random() * 999)}ms`
-    ]
+  const handleExecute = async () => {
+    if (!selectedTool) return
     
-    const result = `
-╔════════════════════════════════════════════════════════════════╗
-║ EXECUTION RESULT                                               ║
-╠════════════════════════════════════════════════════════════════╣
-║ Tool: mcp__claude-flow__${selectedTool?.name}                  ║
-║ Category: ${selectedCategory}                                   ║
-║ Status: SUCCESS                                                ║
-║                                                                ║
-║ Parameters:                                                    ║
-${Object.entries(paramValues).map(([key, value]) => 
-  `║   ${key}: ${JSON.stringify(value)}`.padEnd(65) + '║'
-).join('\n')}
-║                                                                ║
-║ Output:                                                        ║
-║   ${mockResults[Math.floor(Math.random() * mockResults.length)].padEnd(60)} ║
-║                                                                ║
-║ Timestamp: ${new Date().toISOString()}                ║
-╚════════════════════════════════════════════════════════════════╝
-    `.trim()
-    
-    setExecutionResult(result)
+    setExecuting(true)
+    setError(null)
+    setExecutionResult(null)
     setCopiedResult(false)
+    
+    try {
+      // Validate parameters
+      const validation = await mcpBridge.validateParameters(selectedTool.name, paramValues)
+      if (!validation.valid) {
+        setError(`Parameter validation failed: ${validation.errors?.join(', ')}`)
+        return
+      }
+      
+      // Execute the real MCP tool
+      const result = await mcpBridge.executeTool(selectedTool.name, paramValues, {
+        trackMetrics: true,
+        cacheResult: true
+      })
+      
+      setExecutionResult(result)
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Tool execution failed')
+      console.error('Tool execution error:', err)
+    } finally {
+      setExecuting(false)
+    }
   }
 
   const handleCopyResult = () => {
     if (executionResult) {
-      navigator.clipboard.writeText(executionResult)
+      const resultText = formatExecutionResult(executionResult)
+      navigator.clipboard.writeText(resultText)
       setCopiedResult(true)
       setTimeout(() => setCopiedResult(false), 2000)
     }
+  }
+  
+  const formatExecutionResult = (result: ToolExecutionResult): string => {
+    const status = result.success ? 'SUCCESS' : 'FAILED'
+    const statusIcon = result.success ? '✅' : '❌'
+    
+    return `
+╔════════════════════════════════════════════════════════════════╗
+║ MCP TOOL EXECUTION RESULT                                      ║
+╠════════════════════════════════════════════════════════════════╣
+║ Tool: mcp__claude-flow__${selectedTool?.name}                  ║
+║ Category: ${selectedCategory}                                   ║
+║ Status: ${status} ${statusIcon}                                ║
+║ Execution Time: ${result.executionTime}ms                      ║
+║                                                                ║
+║ Parameters:                                                    ║
+${Object.entries(paramValues).map(([key, value]) => 
+  `║   ${key}: ${JSON.stringify(value)}`.slice(0, 64).padEnd(65) + '║'
+).join('\n')}
+║                                                                ║
+║ ${result.success ? 'Output:' : 'Error:'}                                                       ║
+║   ${(result.success ? JSON.stringify(result.data, null, 2) : result.error || 'Unknown error')
+  .split('\n').map(line => line.slice(0, 60).padEnd(60)).join(' ║\n║   ')} ║
+║                                                                ║
+║ Metadata:                                                      ║
+${result.metadata ? Object.entries(result.metadata).map(([key, value]) => 
+  `║   ${key}: ${String(value)}`.slice(0, 64).padEnd(65) + '║'
+).join('\n') : '║   None                                                         ║'}
+║                                                                ║
+║ Timestamp: ${result.metadata?.timestamp || new Date().toISOString()}         ║
+╚════════════════════════════════════════════════════════════════╝
+    `.trim()
   }
 
   return (
@@ -228,9 +358,28 @@ ${Object.entries(paramValues).map(([key, value]) =>
         <h1 className="text-2xl font-bold mb-2 glitch" data-text="MCP TOOLS INTERFACE">
           MCP TOOLS INTERFACE
         </h1>
-        <p className="text-green-600 text-sm">
-          {totalTools}+ Claude Flow MCP Tools • {Object.keys(toolCategories).length} Categories
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-green-600 text-sm">
+            {totalTools}+ {toolsLoaded ? 'Real ' : ''}Claude Flow MCP Tools • {Object.keys(filteredCategories).length} Categories
+          </p>
+          {loading && (
+            <div className="flex items-center gap-2 text-yellow-400 text-sm">
+              <Loader className="w-3 h-3 animate-spin" />
+              Loading real MCP tools...
+            </div>
+          )}
+          {toolsLoaded && (
+            <div className="text-green-400 text-sm">
+              ✅ {realTools.length} real tools loaded
+            </div>
+          )}
+        </div>
+        {error && (
+          <div className="mt-2 p-2 bg-red-900/30 border border-red-400 text-red-400 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            {error}
+          </div>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -257,7 +406,7 @@ ${Object.entries(paramValues).map(([key, value]) =>
         {/* Categories and Tools List */}
         <div className="w-1/2 overflow-y-auto retro-panel">
           <div className="space-y-4">
-            {Object.entries(filteredCategories).map(([key, category]) => {
+            {Object.entries(searchQuery ? filteredCategories : (toolsLoaded ? realToolCategories : toolCategories)).map(([key, category]) => {
               const Icon = category.icon
               return (
                 <div key={key} className="border border-green-900">
@@ -304,7 +453,7 @@ ${Object.entries(paramValues).map(([key, value]) =>
               </div>
 
               {/* Parameters */}
-              {selectedTool.params.length > 0 ? (
+              {selectedTool.params && selectedTool.params.length > 0 ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-bold text-green-400">Parameters:</h3>
                   {selectedTool.params.map((param) => (
@@ -368,28 +517,81 @@ ${Object.entries(paramValues).map(([key, value]) =>
               {/* Execute Button */}
               <button
                 onClick={handleExecute}
-                className="w-full px-4 py-2 bg-green-900/30 border border-green-400 text-green-400 hover:bg-green-900/50 flex items-center justify-center gap-2"
+                disabled={executing || !selectedTool}
+                className={`w-full px-4 py-2 border border-green-400 flex items-center justify-center gap-2 transition-all ${
+                  executing 
+                    ? 'bg-yellow-900/30 text-yellow-400 border-yellow-400' 
+                    : 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
+                } ${(!selectedTool || executing) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <Play className="w-4 h-4" />
-                Execute Tool
+                {executing ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Executing...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    Execute Tool
+                  </>
+                )}
               </button>
 
               {/* Execution Result */}
               {executionResult && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-green-400">Execution Result:</h3>
-                    <button
-                      onClick={handleCopyResult}
-                      className="px-2 py-1 text-xs border border-green-900 text-green-600 hover:text-green-400 hover:border-green-400 flex items-center gap-1"
-                    >
-                      {copiedResult ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      {copiedResult ? 'Copied!' : 'Copy'}
-                    </button>
+                    <h3 className={`text-sm font-bold ${executionResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                      Execution Result: {executionResult.success ? '✅ SUCCESS' : '❌ FAILED'}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-green-600">{executionResult.executionTime}ms</span>
+                      <button
+                        onClick={handleCopyResult}
+                        className="px-2 py-1 text-xs border border-green-900 text-green-600 hover:text-green-400 hover:border-green-400 flex items-center gap-1"
+                      >
+                        {copiedResult ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copiedResult ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
                   </div>
-                  <pre className="p-3 bg-black border border-green-900 text-green-400 text-xs font-mono overflow-x-auto">
-                    {executionResult}
-                  </pre>
+                  
+                  {/* Success Result */}
+                  {executionResult.success && (
+                    <div className="p-3 bg-green-950/30 border border-green-400 rounded">
+                      <div className="text-green-400 text-xs font-mono">
+                        <div className="mb-2 font-bold">Output:</div>
+                        <pre className="whitespace-pre-wrap overflow-x-auto">
+                          {typeof executionResult.data === 'string' 
+                            ? executionResult.data 
+                            : JSON.stringify(executionResult.data, null, 2)}
+                        </pre>
+                      </div>
+                      {executionResult.metadata && (
+                        <div className="mt-3 pt-2 border-t border-green-800 text-green-600 text-xs">
+                          <div className="font-bold mb-1">Metadata:</div>
+                          {Object.entries(executionResult.metadata).map(([key, value]) => (
+                            <div key={key} className="flex justify-between">
+                              <span>{key}:</span>
+                              <span>{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Error Result */}
+                  {!executionResult.success && (
+                    <div className="p-3 bg-red-950/30 border border-red-400 rounded">
+                      <div className="text-red-400 text-xs">
+                        <div className="font-bold mb-2">Error:</div>
+                        <div className="bg-red-900/30 p-2 rounded font-mono">
+                          {executionResult.error || 'Unknown error occurred'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -7,8 +7,17 @@ interface MemoryEntry {
   key: string
   value: any
   timestamp: number
-  type: 'session' | 'swarm' | 'agent' | 'task' | 'neural'
+  type: 'session' | 'swarm' | 'agent' | 'task' | 'neural' | 'hivemind'
   size: number
+  namespace?: string
+  source?: 'swarm' | 'hivemind'
+}
+
+interface HiveMindData {
+  memory: { entries: any[], total: number }
+  hive: { entries: any[], total: number, tables?: string[], agents?: any[], tasks?: any[] }
+  config: any
+  sessions: any[]
 }
 
 const MemoryExplorer: React.FC = () => {
@@ -16,53 +25,120 @@ const MemoryExplorer: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedMemory, setSelectedMemory] = useState<MemoryEntry | null>(null)
+  const [swarmData, setSwarmData] = useState<any>(null)
+  const [hiveMindData, setHiveMindData] = useState<HiveMindData | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - in real app, this would connect to the actual memory store
+  // Fetch real memory data
   useEffect(() => {
-    const mockMemories: MemoryEntry[] = [
-      {
-        id: '1',
-        key: 'swarm/navigation/nav-update',
-        value: { component: 'Navigation', action: 'update', status: 'completed' },
-        timestamp: Date.now() - 300000,
-        type: 'swarm',
-        size: 248
-      },
-      {
-        id: '2',
-        key: 'session/current/state',
-        value: { agents: 5, tasks: 12, uptime: '04:23:17' },
-        timestamp: Date.now() - 120000,
-        type: 'session',
-        size: 156
-      },
-      {
-        id: '3',
-        key: 'agent/architect/decisions',
-        value: { patterns: ['mvc', 'observer'], confidence: 0.92 },
-        timestamp: Date.now() - 60000,
-        type: 'agent',
-        size: 312
-      },
-      {
-        id: '4',
-        key: 'neural/pattern/ui-components',
-        value: { learned: true, accuracy: 0.87, iterations: 42 },
-        timestamp: Date.now() - 180000,
-        type: 'neural',
-        size: 198
-      },
-      {
-        id: '5',
-        key: 'task/navigation-implementation',
-        value: { status: 'in_progress', progress: 75, subtasks: 4 },
-        timestamp: Date.now() - 30000,
-        type: 'task',
-        size: 167
+    const fetchMemoryData = async () => {
+      setLoading(true)
+      const allMemories: MemoryEntry[] = []
+
+      try {
+        // Fetch Swarm memory
+        const swarmResponse = await fetch('http://localhost:3001/api/memory/swarm')
+        if (swarmResponse.ok) {
+          const data = await swarmResponse.json()
+          setSwarmData(data)
+          
+          // Convert swarm entries to MemoryEntry format
+          if (data.entries) {
+            data.entries.forEach((entry: any, index: number) => {
+              allMemories.push({
+                id: `swarm-${index}`,
+                key: entry.key,
+                value: entry.value,
+                timestamp: new Date(entry.updated_at || entry.created_at).getTime(),
+                type: determineType(entry.key),
+                size: JSON.stringify(entry.value).length,
+                namespace: entry.namespace,
+                source: 'swarm'
+              })
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch swarm memory:', error)
       }
-    ]
-    setMemories(mockMemories)
+
+      try {
+        // Fetch HiveMind memory
+        const hiveResponse = await fetch('http://localhost:3001/api/memory/hivemind')
+        if (hiveResponse.ok) {
+          const data = await hiveResponse.json()
+          setHiveMindData(data)
+          
+          // Convert hivemind memory entries
+          if (data.memory?.entries) {
+            data.memory.entries.forEach((entry: any, index: number) => {
+              allMemories.push({
+                id: `hive-mem-${index}`,
+                key: entry.key || entry.id || `memory-${index}`,
+                value: entry.value || entry,
+                timestamp: new Date(entry.updated_at || entry.created_at || Date.now()).getTime(),
+                type: 'hivemind',
+                size: JSON.stringify(entry).length,
+                namespace: entry.namespace || 'hivemind',
+                source: 'hivemind'
+              })
+            })
+          }
+
+          // Add session files as memories
+          if (data.sessions) {
+            data.sessions.forEach((session: any, index: number) => {
+              if (session.data) {
+                allMemories.push({
+                  id: `session-${index}`,
+                  key: `session/${session.filename}`,
+                  value: session.data,
+                  timestamp: Date.now() - index * 60000, // Stagger timestamps
+                  type: 'session',
+                  size: session.size || JSON.stringify(session.data).length,
+                  source: 'hivemind'
+                })
+              }
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch hivemind memory:', error)
+      }
+
+      // If no real data, add some mock entries
+      if (allMemories.length === 0) {
+        const mockMemories: MemoryEntry[] = [
+          {
+            id: '1',
+            key: 'demo/swarm/init',
+            value: { info: 'No memory data found in .swarm/ or .hive-mind/' },
+            timestamp: Date.now(),
+            type: 'swarm',
+            size: 128
+          }
+        ];
+        allMemories.push(...mockMemories);
+      }
+
+      setMemories(allMemories.sort((a, b) => b.timestamp - a.timestamp));
+      setLoading(false);
+    }
+
+    fetchMemoryData();
+    const interval = setInterval(fetchMemoryData, 10000); // Refresh every 10 seconds
+    return () => clearInterval(interval);
   }, [])
+
+  // Helper function to determine type from key
+  const determineType = (key: string): MemoryEntry['type'] => {
+    if (key.includes('session')) return 'session'
+    if (key.includes('agent')) return 'agent'
+    if (key.includes('task')) return 'task'
+    if (key.includes('neural')) return 'neural'
+    if (key.includes('hive')) return 'hivemind'
+    return 'swarm'
+  }
 
   const filteredMemories = memories.filter(memory => {
     const matchesSearch = memory.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,6 +148,11 @@ const MemoryExplorer: React.FC = () => {
   })
 
   const totalSize = memories.reduce((acc, mem) => acc + mem.size, 0)
+  const swarmCount = memories.filter(m => m.source === 'swarm').length
+  const hiveCount = memories.filter(m => m.source === 'hivemind').length
+  const sessionCount = memories.filter(m => m.type === 'session').length
+  const neuralCount = memories.filter(m => m.type === 'neural').length
+  
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes}B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
@@ -118,12 +199,12 @@ const MemoryExplorer: React.FC = () => {
           <div className="text-xl font-bold text-green-400 font-mono">{formatSize(totalSize)}</div>
         </div>
         <div className="bg-black/50 border border-green-900 p-3 rounded">
-          <div className="text-xs text-green-600 mb-1">ACTIVE SESSIONS</div>
-          <div className="text-xl font-bold text-green-400 font-mono">3</div>
+          <div className="text-xs text-green-600 mb-1">SWARM MEMORIES</div>
+          <div className="text-xl font-bold text-green-400 font-mono">{swarmCount}</div>
         </div>
         <div className="bg-black/50 border border-green-900 p-3 rounded">
-          <div className="text-xs text-green-600 mb-1">NEURAL PATTERNS</div>
-          <div className="text-xl font-bold text-green-400 font-mono">27</div>
+          <div className="text-xs text-green-600 mb-1">HIVEMIND ENTRIES</div>
+          <div className="text-xl font-bold text-green-400 font-mono">{hiveCount}</div>
         </div>
       </div>
 
@@ -150,12 +231,21 @@ const MemoryExplorer: React.FC = () => {
           <option value="agent">AGENT</option>
           <option value="task">TASK</option>
           <option value="neural">NEURAL</option>
+          <option value="hivemind">HIVEMIND</option>
         </select>
       </div>
 
       {/* Memory List */}
       <div className="flex-1 flex gap-4 min-h-0">
         <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-pulse text-green-400 text-xl mb-2">Loading Memory Banks...</div>
+                <div className="text-green-600 text-sm">Accessing .swarm/ and .hive-mind/ databases</div>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-2">
             <AnimatePresence>
               {filteredMemories.map((memory) => (
@@ -184,6 +274,7 @@ const MemoryExplorer: React.FC = () => {
               ))}
             </AnimatePresence>
           </div>
+          )}
         </div>
 
         {/* Detail View */}
@@ -215,6 +306,18 @@ const MemoryExplorer: React.FC = () => {
                   {JSON.stringify(selectedMemory.value, null, 2)}
                 </pre>
               </div>
+              {selectedMemory.namespace && (
+                <div>
+                  <div className="text-xs text-green-600 mb-1">NAMESPACE</div>
+                  <div className="text-sm text-green-400 font-mono">{selectedMemory.namespace}</div>
+                </div>
+              )}
+              {selectedMemory.source && (
+                <div>
+                  <div className="text-xs text-green-600 mb-1">SOURCE</div>
+                  <div className="text-sm text-green-400 font-mono uppercase">{selectedMemory.source}</div>
+                </div>
+              )}
             </div>
           </div>
         )}

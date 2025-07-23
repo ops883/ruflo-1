@@ -43,16 +43,19 @@ export class HiveMindClient {
   private messageHandlers: Map<string, (data: any) => void>;
   private requestCallbacks: Map<string, (response: any) => void>;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private baseUrl: string;
 
   constructor(config: Partial<HiveMindConfig> = {}) {
     this.config = {
       url: config.url || 'localhost',
-      port: config.port || 3006,
+      port: config.port || 3001, // Changed to match our backend server
       reconnect: config.reconnect !== false,
       maxReconnectAttempts: config.maxReconnectAttempts || 10,
       reconnectDelay: config.reconnectDelay || 1000,
       ...config
     };
+
+    this.baseUrl = `http://${this.config.url}:${this.config.port}`;
 
     this.connection = {
       ws: null,
@@ -270,7 +273,25 @@ export class HiveMindClient {
     maxAgents?: number;
     strategy?: string;
   }): Promise<string> {
-    return this.request('swarm-init', params);
+    try {
+      // Try HTTP API first (more reliable for requests)
+      const response = await fetch(`${this.baseUrl}/api/swarm/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result.swarmId;
+      }
+
+      // Fallback to WebSocket if HTTP fails
+      return this.request('swarm-init', params);
+    } catch (error) {
+      // Final fallback to WebSocket
+      return this.request('swarm-init', params);
+    }
   }
 
   /**
