@@ -35,7 +35,8 @@ export type WorkerType =
   | 'document'
   | 'refactor'
   | 'benchmark'
-  | 'testgaps';
+  | 'testgaps'
+  | 'attention';
 
 interface WorkerConfig {
   type: WorkerType;
