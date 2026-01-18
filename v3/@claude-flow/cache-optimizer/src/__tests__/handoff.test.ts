@@ -193,7 +193,7 @@ describe('CircuitBreakerRegistry', () => {
 
   it('should track health across providers', () => {
     const breaker1 = registry.get('provider-1');
-    const breaker2 = registry.get('provider-2');
+    const breaker2 = registry.get('provider-2', { failureThreshold: 3 });
 
     breaker1.recordSuccess();
     breaker1.recordSuccess();
@@ -201,11 +201,11 @@ describe('CircuitBreakerRegistry', () => {
 
     breaker2.recordFailure();
     breaker2.recordFailure();
-    breaker2.recordFailure(); // Open
+    breaker2.recordFailure(); // Opens after 3 failures
 
-    const unhealthy = registry.getUnhealthyProviders();
-    expect(unhealthy).toContain('provider-2');
-    expect(unhealthy).not.toContain('provider-1');
+    const openCircuits = registry.getOpenCircuits();
+    expect(openCircuits).toContain('provider-2');
+    expect(openCircuits).not.toContain('provider-1');
   });
 
   it('should get all stats', () => {
