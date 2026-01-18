@@ -29,7 +29,7 @@ export {
 export {
   CircuitBreaker,
   CircuitBreakerRegistry,
-  defaultCircuitBreakerRegistry,
+  defaultRegistry as defaultCircuitBreakerRegistry,
   type CircuitBreakerConfig,
   type CircuitState,
   type CircuitStats,
