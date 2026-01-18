@@ -26,5 +26,10 @@
   },
   "peerDependencies": {
     "@claude-flow/core": "^3.0.0-alpha"
+  },
+  "peerDependenciesMeta": {
+    "@claude-flow/core": {
+      "optional": true
+    }
   }
 }
