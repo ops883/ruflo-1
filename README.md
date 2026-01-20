@@ -4412,6 +4412,10 @@ npx claude-flow@v3alpha pair end
 
 ---
 
+## 🛡️ Security
+
+AI manipulation defense, threat detection, and input validation.
+
 <details>
 <summary>🛡️ <strong>AIDefence Security</strong> — Threat Detection, PII Scanning</summary>
 
