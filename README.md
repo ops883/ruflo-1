@@ -5300,7 +5300,7 @@ console.log(TEST_CONFIG.AGENTDB_SEARCH_IMPROVEMENT_MAX); // 12500
 ---
 
 <details>
-<summary><h2>💻 Cross-Platform Support </h2></summary>
+<summary>💻 <strong>Cross-Platform Support</strong></summary>
 
 
 ### Windows (PowerShell)
