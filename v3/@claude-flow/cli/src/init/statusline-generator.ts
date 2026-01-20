@@ -905,15 +905,46 @@ function generateStatusline() {
   const hooks = getHooksStatus();
   const agentdb = getAgentDBStats();
   const tests = getTestStats();
+  const git = getGitStatus();
+  const session = getSessionStats();
   const lines = [];
 
-  // Header Line
+  // Calculate intelligence trend
+  const intellTrend = getTrend(system.intelligencePct, prevIntelligence);
+
+  // Save current values for next trend calculation
+  try {
+    const trendPath = path.join(process.cwd(), '.claude-flow', '.trend-cache.json');
+    const trendDir = path.dirname(trendPath);
+    if (!fs.existsSync(trendDir)) fs.mkdirSync(trendDir, { recursive: true });
+    fs.writeFileSync(trendPath, JSON.stringify({ intelligence: system.intelligencePct, timestamp: Date.now() }));
+  } catch (e) { /* ignore */ }
+
+  // Header Line with git changes indicator
   let header = \`\${c.bold}\${c.brightPurple}▊ Claude Flow V3 \${c.reset}\`;
   header += \`\${swarm.coordinationActive ? c.brightCyan : c.dim}● \${c.brightCyan}\${user.name}\${c.reset}\`;
   if (user.gitBranch) {
     header += \`  \${c.dim}│\${c.reset}  \${c.brightBlue}⎇ \${user.gitBranch}\${c.reset}\`;
+    // Add git changes indicator
+    const gitChanges = git.modified + git.staged + git.untracked;
+    if (gitChanges > 0) {
+      let gitIndicator = '';
+      if (git.staged > 0) gitIndicator += \`\${c.brightGreen}+\${git.staged}\${c.reset}\`;
+      if (git.modified > 0) gitIndicator += \`\${c.brightYellow}~\${git.modified}\${c.reset}\`;
+      if (git.untracked > 0) gitIndicator += \`\${c.dim}?\${git.untracked}\${c.reset}\`;
+      header += \` \${gitIndicator}\`;
+    }
+    // Add ahead/behind indicator
+    if (git.ahead > 0 || git.behind > 0) {
+      if (git.ahead > 0) header += \` \${c.brightGreen}↑\${git.ahead}\${c.reset}\`;
+      if (git.behind > 0) header += \` \${c.brightRed}↓\${git.behind}\${c.reset}\`;
+    }
   }
   header += \`  \${c.dim}│\${c.reset}  \${c.purple}\${user.modelName}\${c.reset}\`;
+  // Add session duration if available
+  if (session.duration) {
+    header += \`  \${c.dim}│\${c.reset}  \${c.cyan}⏱ \${session.duration}\${c.reset}\`;
+  }
   lines.push(header);
 
   // Separator
