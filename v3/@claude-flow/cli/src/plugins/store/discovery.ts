@@ -16,6 +16,38 @@ import type {
 import { resolveIPNS, fetchFromIPFS } from '../../transfer/ipfs/client.js';
 
 /**
+ * Fetch real npm download stats for a package
+ */
+async function fetchNpmStats(packageName: string): Promise<{ downloads: number; version: string } | null> {
+  try {
+    // Fetch last week downloads
+    const downloadsUrl = `https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(packageName)}`;
+    const downloadsRes = await fetch(downloadsUrl, { signal: AbortSignal.timeout(3000) });
+
+    if (!downloadsRes.ok) return null;
+
+    const downloadsData = await downloadsRes.json() as { downloads?: number };
+
+    // Fetch package info for version
+    const packageUrl = `https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`;
+    const packageRes = await fetch(packageUrl, { signal: AbortSignal.timeout(3000) });
+
+    let version = 'unknown';
+    if (packageRes.ok) {
+      const packageData = await packageRes.json() as { version?: string };
+      version = packageData.version || 'unknown';
+    }
+
+    return {
+      downloads: downloadsData.downloads || 0,
+      version,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Default plugin store configuration
  */
 export const DEFAULT_PLUGIN_STORE_CONFIG: PluginStoreConfig = {
