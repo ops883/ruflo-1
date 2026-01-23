@@ -60,6 +60,18 @@
     "@claude-flow/embeddings": ">=3.0.0"
   },
   "peerDependenciesMeta": {
+    "@claude-flow/plugins": {
+      "optional": true
+    },
+    "@claude-flow/memory": {
+      "optional": true
+    },
+    "@claude-flow/security": {
+      "optional": true
+    },
+    "@claude-flow/embeddings": {
+      "optional": true
+    },
     "@claude-flow/browser": {
       "optional": true
     },
