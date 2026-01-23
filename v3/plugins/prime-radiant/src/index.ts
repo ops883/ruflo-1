@@ -330,3 +330,37 @@ export const pluginMetadata = {
  * Default export for convenience
  */
 export default PrimeRadiantPlugin;
+
+// ============================================================================
+// MCP Tool Handler Exports
+// ============================================================================
+
+// Export individual MCP tool handlers from tools directory
+export {
+  primeRadiantTools,
+  coherenceCheckTool,
+  spectralAnalyzeTool,
+  causalInferTool,
+  consensusVerifyTool,
+  quantumTopologyTool,
+  memoryGateTool,
+  getTool,
+  getToolNames,
+  getToolsByCategory,
+  toolCategories,
+  toolHandlers,
+} from './tools/index.js';
+
+// Re-export tool types for convenience
+export type {
+  MCPTool as ToolMCPTool,
+  MCPToolResult as ToolMCPToolResult,
+  ToolContext as ToolHandlerContext,
+  CoherenceOutput,
+  SpectralOutput,
+  CausalOutput,
+  ConsensusOutput,
+  TopologyOutput,
+  MemoryGateOutput,
+  PerformanceMetrics,
+} from './tools/types.js';
