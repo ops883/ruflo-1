@@ -688,6 +688,9 @@ export class PluginDiscoveryService {
       '@claude-flow/claims',
       '@claude-flow/security',
       '@claude-flow/plugins',
+      '@claude-flow/embeddings',
+      '@claude-flow/neural',
+      '@claude-flow/performance',
     ];
 
     // Fetch stats in parallel
