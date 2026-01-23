@@ -160,10 +160,10 @@ interface QEWorkerDefinition {
 interface QEAgentDefinition {
   id: string;
   name?: string;
-  type: string;
+  type?: string;
   context: string | BoundedContext;
   capabilities: string[];
-  modelTier?: string;
+  modelTier?: ModelTier;
   description?: string;
 }
 
