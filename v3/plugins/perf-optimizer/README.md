@@ -179,6 +179,17 @@ interface PerfOptimizerConfig {
 - **WASM Sandboxing**: All analysis runs in isolated WASM sandbox with 2GB memory limit and no network access
 - **Path Validation**: Bundle stats paths are validated to prevent path traversal attacks
 - **Input Validation**: All inputs validated with Zod schemas to prevent injection attacks
+- **No Code Execution**: Performance suggestions are recommendations only - no automatic code modification
+
+### WASM Security Constraints
+
+| Constraint | Value | Rationale |
+|------------|-------|-----------|
+| Memory Limit | 2GB max | Handle large trace datasets |
+| CPU Time Limit | 300 seconds | Allow deep performance analysis |
+| No Network Access | Enforced | Prevent data exfiltration |
+| No File System Write | Enforced | Read-only analysis mode |
+| Sandboxed Paths | Validated prefixes only | Prevent path traversal |
 
 ### Input Limits
 
@@ -188,7 +199,20 @@ interface PerfOptimizerConfig {
 | Max query size | 10KB |
 | Max queries per batch | 10,000 |
 | Max heap snapshot size | 1GB |
+| Max bundle stats size | 50MB |
 | CPU time limit | 300 seconds |
+
+### Rate Limiting
+
+```typescript
+const rateLimits = {
+  'perf/bottleneck-detect': { requestsPerMinute: 10, maxConcurrent: 2 },
+  'perf/memory-analyze': { requestsPerMinute: 5, maxConcurrent: 1 },
+  'perf/query-optimize': { requestsPerMinute: 30, maxConcurrent: 3 },
+  'perf/bundle-optimize': { requestsPerMinute: 10, maxConcurrent: 2 },
+  'perf/config-optimize': { requestsPerMinute: 5, maxConcurrent: 1 }
+};
+```
 
 ## Dependencies
 
