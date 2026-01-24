@@ -94,12 +94,12 @@ export class GNNBridge implements IGNNBridge {
 
     try {
       // Dynamic import of WASM module
-      this._wasmModule = await this.loadWasmModule();
+      this.wasmModule = await this.loadWasmModule();
       this.initialized = true;
     } catch {
       // Fallback to pure JS implementation
       console.warn('WASM GNN module not available, using JS fallback');
-      this._wasmModule = null;
+      this.wasmModule = null;
       this.initialized = true;
     }
   }
