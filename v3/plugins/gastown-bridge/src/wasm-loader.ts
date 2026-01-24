@@ -888,27 +888,40 @@ export async function topoSort(
   edges: GraphEdge[]
 ): Promise<TopoSortResult> {
   const startTime = performance.now();
+  const cacheKey = hashGraphKey(nodes, edges);
 
-  const wasmModule = await loadGnnWasm();
-
-  if (wasmModule) {
-    try {
-      const resultJson = wasmModule.topo_sort(
-        JSON.stringify(nodes),
-        JSON.stringify(edges)
-      );
-      const result = JSON.parse(resultJson) as TopoSortResult;
-      recordTiming('topoSort', startTime, true);
-      return result;
-    } catch (error) {
-      console.warn('[WASM Loader] topo_sort failed, using fallback:', error);
-    }
+  // Check LRU cache first (O(1) lookup)
+  const cached = topoSortCache.get(cacheKey);
+  if (cached) {
+    recordTiming('topoSort:cache-hit', startTime, false);
+    return cached;
   }
 
-  // JavaScript fallback
-  const result = topoSortFallback(nodes, edges);
-  recordTiming('topoSort', startTime, false);
-  return result;
+  // Use batch deduplication for concurrent requests
+  return graphDedup.dedupe(cacheKey, async () => {
+    const wasmModule = await loadGnnWasm();
+
+    if (wasmModule) {
+      try {
+        const resultJson = wasmModule.topo_sort(
+          JSON.stringify(nodes),
+          JSON.stringify(edges)
+        );
+        const result = JSON.parse(resultJson) as TopoSortResult;
+        topoSortCache.set(cacheKey, result);
+        recordTiming('topoSort', startTime, true);
+        return result;
+      } catch (error) {
+        console.warn('[WASM Loader] topo_sort failed, using fallback:', error);
+      }
+    }
+
+    // JavaScript fallback
+    const result = topoSortFallback(nodes, edges);
+    topoSortCache.set(cacheKey, result);
+    recordTiming('topoSort', startTime, false);
+    return result;
+  });
 }
 
 /**
