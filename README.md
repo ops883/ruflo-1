@@ -2706,7 +2706,7 @@ npx claude-flow@v3alpha transfer-store publish --input ./my-patterns.json --cate
 
 ### Plugin Store
 
-Discover and install community plugins.
+Discover and install community plugins from the **live IPFS registry** with 19 official plugins.
 
 | Command | Description |
 |---------|-------------|
@@ -2726,15 +2726,32 @@ npx claude-flow@v3alpha transfer plugin-info --name "semantic-code-search"
 npx claude-flow@v3alpha transfer plugin-official
 ```
 
+#### Live IPFS Plugin Registry
+
+The official plugin registry is hosted on IPFS with Ed25519 signature verification:
+
+| Property | Value |
+|----------|-------|
+| **Live CID** | `bafkreiahw4ufxwycbwwswt7rgbx6hkgnvg3rophhocatgec4bu5e7tzk2a` |
+| **Plugins** | 19 official plugins |
+| **Verification** | Ed25519 signed registry |
+| **Gateways** | Pinata, ipfs.io, dweb.link, Cloudflare |
+
+```bash
+# Fetch live registry directly
+curl -s "https://gateway.pinata.cloud/ipfs/bafkreiahw4ufxwycbwwswt7rgbx6hkgnvg3rophhocatgec4bu5e7tzk2a"
+```
+
 ### IPFS Integration
 
-Patterns are distributed via IPFS for decentralization and integrity.
+Patterns and models are distributed via IPFS for decentralization and integrity.
 
 | Feature | Benefit |
 |---------|---------|
 | **Content Addressing** | Patterns identified by hash, tamper-proof |
 | **Decentralized** | No single point of failure |
-| **Versioning** | IPNS names for mutable references |
+| **Ed25519 Signatures** | Cryptographic registry verification |
+| **Multi-Gateway** | Automatic failover (Pinata, ipfs.io, dweb.link) |
 | **PII Detection** | Automatic scanning before publish |
 
 ```bash
@@ -2744,6 +2761,46 @@ npx claude-flow@v3alpha transfer ipfs-resolve --name "/ipns/patterns.claude-flow
 # Detect PII before publishing
 npx claude-flow@v3alpha transfer detect-pii --content "$(cat ./patterns.json)"
 ```
+
+### Model & Learning Pattern Import/Export
+
+Share trained neural patterns and learning models via IPFS.
+
+| Operation | Description |
+|-----------|-------------|
+| **Export** | Pin learning patterns to IPFS, get shareable CID |
+| **Import** | Fetch patterns from any IPFS CID |
+| **Analytics** | Track downloads and sharing metrics |
+
+```bash
+# Export a learning pattern to IPFS
+curl -X POST "https://api.pinata.cloud/pinning/pinJSONToIPFS" \
+  -H "Authorization: Bearer $PINATA_JWT" \
+  -d '{
+    "pinataContent": {
+      "type": "learning-pattern",
+      "name": "my-patterns",
+      "patterns": [...]
+    },
+    "pinataMetadata": {"name": "claude-flow-learning-pattern"}
+  }'
+
+# Import a pattern from IPFS CID
+curl -s "https://gateway.pinata.cloud/ipfs/QmYourCIDHere"
+
+# Via Cloud Function (when deployed)
+curl "https://publish-registry-xxx.cloudfunctions.net?action=export-model" -d @model.json
+curl "https://publish-registry-xxx.cloudfunctions.net?action=import-model&cid=QmXxx"
+```
+
+#### Supported Model Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| `learning-pattern` | Agent learning patterns | Code review, security analysis |
+| `neural-weights` | Trained neural weights | SONA, MoE routing |
+| `reasoning-bank` | Reasoning trajectories | Few-shot learning |
+| `agent-config` | Agent configurations | Swarm templates |
 
 ### Pre-Built Pattern Packs
 
