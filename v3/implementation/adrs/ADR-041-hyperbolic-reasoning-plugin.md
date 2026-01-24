@@ -287,6 +287,200 @@ Uniform density              Exponential capacity toward boundary
 | Entailment graph build | <30s for 100K concepts | ~10min (pairwise comparison) | 20x |
 | Dimension efficiency | 32-dim hyperbolic | 512-dim Euclidean equivalent | 16x memory |
 
+## Security Considerations
+
+### Input Validation (CRITICAL)
+
+All MCP tool inputs MUST be validated using Zod schemas:
+
+```typescript
+// hyperbolic/embed-hierarchy input validation
+const EmbedHierarchySchema = z.object({
+  hierarchy: z.object({
+    nodes: z.array(z.object({
+      id: z.string().max(200),
+      parent: z.string().max(200).nullable(),
+      features: z.record(z.string(), z.unknown()).optional()
+    })).min(1).max(1_000_000), // Max 1M nodes
+    edges: z.array(z.object({
+      source: z.string().max(200),
+      target: z.string().max(200),
+      weight: z.number().finite().optional()
+    })).max(10_000_000).optional()
+  }),
+  model: z.enum(['poincare_ball', 'lorentz', 'klein', 'half_plane']).default('poincare_ball'),
+  parameters: z.object({
+    dimensions: z.number().int().min(2).max(512).default(32),
+    curvature: z.number().min(-10).max(-0.01).default(-1.0),
+    learnCurvature: z.boolean().default(true)
+  }).optional()
+});
+
+// hyperbolic/taxonomic-reason input validation
+const TaxonomicReasonSchema = z.object({
+  query: z.object({
+    type: z.enum(['is_a', 'subsumption', 'lowest_common_ancestor', 'path', 'similarity']),
+    subject: z.string().max(500),
+    object: z.string().max(500).optional()
+  }),
+  taxonomy: z.string().max(200),
+  inference: z.object({
+    transitive: z.boolean().default(true),
+    fuzzy: z.boolean().default(false),
+    confidence: z.number().min(0).max(1).default(0.8)
+  }).optional()
+});
+
+// hyperbolic/semantic-search input validation
+const SemanticSearchSchema = z.object({
+  query: z.string().max(5000),
+  index: z.string().max(200),
+  searchMode: z.enum(['nearest', 'subtree', 'ancestors', 'siblings', 'cone']).default('nearest'),
+  constraints: z.object({
+    maxDepth: z.number().int().min(0).max(100).optional(),
+    minDepth: z.number().int().min(0).max(100).optional(),
+    subtreeRoot: z.string().max(200).optional()
+  }).optional(),
+  topK: z.number().int().min(1).max(10000).default(10)
+});
+
+// hyperbolic/entailment-graph input validation
+const EntailmentGraphSchema = z.object({
+  action: z.enum(['build', 'query', 'expand', 'prune']),
+  concepts: z.array(z.object({
+    id: z.string().max(200),
+    text: z.string().max(5000),
+    type: z.string().max(100).optional()
+  })).max(100000).optional(),
+  entailmentThreshold: z.number().min(0).max(1).default(0.7),
+  transitiveClosure: z.boolean().default(true),
+  pruneStrategy: z.enum(['none', 'transitive_reduction', 'confidence_threshold']).optional()
+});
+```
+
+### WASM Security Constraints
+
+| Constraint | Value | Rationale |
+|------------|-------|-----------|
+| Memory Limit | 2GB max | Handle large hierarchies |
+| CPU Time Limit | 300 seconds for embedding | Large graph embedding takes time |
+| Node Limit | 1M nodes max | Bound computational complexity |
+| Edge Limit | 10M edges max | Prevent memory exhaustion |
+| Dimension Limit | 512 max | Reasonable embedding size |
+
+### Numerical Security (CRITICAL for Hyperbolic)
+
+```typescript
+// Hyperbolic operations have numerical instabilities near boundary
+// MUST implement defensive numerical handling
+
+const POINCARE_BALL_EPS = 1e-10;  // Minimum distance from boundary
+const MAX_NORM = 1 - POINCARE_BALL_EPS;  // Maximum vector norm
+
+// Clip vectors to stay within Poincare ball
+function clipToBall(vector: number[], curvature: number): number[] {
+  const norm = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
+  const maxNorm = MAX_NORM / Math.sqrt(-curvature);
+
+  if (norm > maxNorm) {
+    const scale = maxNorm / norm;
+    return vector.map(v => v * scale);
+  }
+
+  return vector;
+}
+
+// Safe Mobius addition (handles edge cases)
+function safeMobiusAdd(x: number[], y: number[], c: number): number[] {
+  // Check inputs are finite
+  if (!x.every(Number.isFinite) || !y.every(Number.isFinite)) {
+    throw new NumericalError('Non-finite input to Mobius addition');
+  }
+
+  // Clip to ball before operation
+  x = clipToBall(x, c);
+  y = clipToBall(y, c);
+
+  // Perform operation with numerical guards
+  // ... implementation with overflow checking
+}
+```
+
+### Output Validation
+
+```typescript
+// Validate all hyperbolic outputs for numerical sanity
+function validateHyperbolicOutput(result: HyperbolicResult): ValidationResult {
+  // Check embeddings are within Poincare ball
+  for (const embedding of result.embeddings) {
+    const norm = Math.sqrt(embedding.reduce((sum, v) => sum + v * v, 0));
+    if (norm >= 1.0) {
+      return { valid: false, error: 'Embedding outside Poincare ball' };
+    }
+    if (!embedding.every(Number.isFinite)) {
+      return { valid: false, error: 'Non-finite embedding values' };
+    }
+  }
+
+  // Check distances are non-negative
+  for (const distance of result.distances || []) {
+    if (distance < 0 || !Number.isFinite(distance)) {
+      return { valid: false, error: 'Invalid distance value' };
+    }
+  }
+
+  return { valid: true };
+}
+```
+
+### Identified Security Risks
+
+| Risk ID | Severity | Description | Mitigation |
+|---------|----------|-------------|------------|
+| HYPER-SEC-001 | **HIGH** | DoS via deeply nested hierarchies | Depth limits, progressive processing |
+| HYPER-SEC-002 | **HIGH** | Numerical overflow near boundary | Boundary clipping, epsilon guards |
+| HYPER-SEC-003 | **MEDIUM** | NaN/Infinity propagation | Input/output validation |
+| HYPER-SEC-004 | **MEDIUM** | Memory exhaustion via large graphs | Node/edge limits |
+| HYPER-SEC-005 | **LOW** | Curvature manipulation attacks | Curvature bounds (-10 to -0.01) |
+
+### Denial of Service Prevention
+
+```typescript
+// Hierarchies can be crafted to cause exponential blowup
+function validateHierarchy(hierarchy: Hierarchy): ValidationResult {
+  // Check for cycles (would cause infinite traversal)
+  if (hasCycle(hierarchy)) {
+    return { valid: false, error: 'Hierarchy contains cycles' };
+  }
+
+  // Check depth (very deep hierarchies cause numerical issues)
+  const maxDepth = computeMaxDepth(hierarchy);
+  if (maxDepth > 100) {
+    return { valid: false, error: `Hierarchy too deep: ${maxDepth} > 100` };
+  }
+
+  // Check branching factor (wide trees cause memory issues)
+  const maxBranching = computeMaxBranching(hierarchy);
+  if (maxBranching > 10000) {
+    return { valid: false, error: `Branching factor too high: ${maxBranching}` };
+  }
+
+  return { valid: true };
+}
+```
+
+### Rate Limiting
+
+```typescript
+const HyperbolicRateLimits = {
+  'hyperbolic/embed-hierarchy': { requestsPerMinute: 5, maxConcurrent: 1 },
+  'hyperbolic/taxonomic-reason': { requestsPerMinute: 60, maxConcurrent: 5 },
+  'hyperbolic/semantic-search': { requestsPerMinute: 60, maxConcurrent: 5 },
+  'hyperbolic/hierarchy-compare': { requestsPerMinute: 10, maxConcurrent: 2 },
+  'hyperbolic/entailment-graph': { requestsPerMinute: 10, maxConcurrent: 2 }
+};
+```
+
 ## Risk Assessment
 
 | Risk | Likelihood | Impact | Mitigation |
