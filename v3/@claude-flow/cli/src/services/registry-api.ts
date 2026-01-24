@@ -109,7 +109,7 @@ export async function getRating(
     throw new Error('Failed to get ratings');
   }
 
-  return response.json();
+  return response.json() as Promise<RatingResponse>;
 }
 
 /**
