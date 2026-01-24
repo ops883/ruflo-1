@@ -333,6 +333,14 @@ Secrets are automatically detected and masked in search results:
 - `@babel/parser`: JavaScript/TypeScript AST parsing
 - `typescript`: TypeScript compiler API
 
+## Related Plugins
+
+| Plugin | Description | Use Case |
+|--------|-------------|----------|
+| [@claude-flow/plugin-test-intelligence](../test-intelligence) | Test optimization | Predictive test selection based on code changes |
+| [@claude-flow/plugin-perf-optimizer](../perf-optimizer) | Performance optimization | Code performance bottleneck detection |
+| [@claude-flow/plugin-legal-contracts](../legal-contracts) | Contract analysis | Software licensing compliance |
+
 ## License
 
 MIT License
