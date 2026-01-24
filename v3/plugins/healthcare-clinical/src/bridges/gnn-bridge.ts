@@ -537,7 +537,8 @@ export class HealthcareGNNBridge implements GNNBridge {
 
   private async resolveWasmPath(): Promise<string | null> {
     try {
-      const module = await import('ruvector-gnn-wasm');
+      // Dynamic import with type assertion for optional WASM package
+      const module = await import(/* webpackIgnore: true */ 'ruvector-gnn-wasm' as string) as { default?: string };
       return module.default ?? null;
     } catch {
       return null;
