@@ -1408,31 +1408,52 @@ export class GasTownBridgePlugin extends EventEmitter implements IPlugin {
         if (priority !== undefined) args.push('--priority', String(priority));
         await gt.execGt(args);
       },
-      async listAgents(_rig?: string, _role?: string, _includeInactive?: boolean) {
+      async listAgents(_rig, _role, _includeInactive) {
         // Would need agent registry - return empty for now
-        return [] as Array<{ id: string; name: string; role: string; status: string }>;
+        // Return type matches GasTownAgent[]
+        return [] as import('./types.js').GasTownAgent[];
       },
-      async sendMail(to: string, subject: string, body: string) {
+      async sendMail(to, subject, body) {
         if (!gt) throw new GasTownError('GtBridge not initialized', GasTownErrorCode.NOT_INITIALIZED);
         // Use execGt for mail operations
         const result = await gt.execGt(['tx', 'mail', '--to', to, '--subject', subject, '--body', body, '--json']);
         return { messageId: result.data ?? 'unknown', status: result.success ? 'sent' : 'failed' };
       },
-      async readMail(mailId: string) {
+      async readMail(mailId) {
         if (!gt) throw new GasTownError('GtBridge not initialized', GasTownErrorCode.NOT_INITIALIZED);
         const result = await gt.execGt(['tx', 'mail', 'read', mailId, '--json']);
         if (result.success && result.data) {
-          return gt.parseGtOutput<{ id: string; from: string; subject: string; body: string; timestamp: string }>(result.data);
+          const parsed = gt.parseGtOutput<{ id: string; from: string; to?: string; subject: string; body: string; timestamp: string }>(result.data);
+          // Map to GasTownMail type
+          return {
+            id: parsed.id,
+            from: parsed.from,
+            to: parsed.to ?? '',
+            subject: parsed.subject,
+            body: parsed.body,
+            sentAt: new Date(parsed.timestamp),
+            read: true,
+          };
         }
         throw new GasTownError(`Failed to read mail: ${mailId}`, GasTownErrorCode.NOT_INITIALIZED);
       },
-      async listMail(limit?: number) {
+      async listMail(limit) {
         if (!gt) throw new GasTownError('GtBridge not initialized', GasTownErrorCode.NOT_INITIALIZED);
         const args = ['tx', 'mail', 'list', '--json'];
         if (limit !== undefined) args.push('--limit', String(limit));
         const result = await gt.execGt(args);
         if (result.success && result.data) {
-          return gt.parseGtOutput<Array<{ id: string; from: string; subject: string; timestamp: string }>>(result.data);
+          const parsed = gt.parseGtOutput<Array<{ id: string; from: string; to?: string; subject: string; body?: string; timestamp: string }>>(result.data);
+          // Map to GasTownMail[] type
+          return parsed.map(m => ({
+            id: m.id,
+            from: m.from,
+            to: m.to ?? '',
+            subject: m.subject,
+            body: m.body ?? '',
+            sentAt: new Date(m.timestamp),
+            read: false,
+          }));
         }
         return [];
       },
