@@ -163,3 +163,4 @@ hive-mind-prompt-*.txt
 .env.*.local
 .claude/worktrees/awesome-johnson-06f348/
 .claude/worktrees/clever-elbakyan-bcf0d9/
+.claude/worktrees/nifty-bardeen-839c62/
