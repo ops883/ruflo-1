@@ -25,6 +25,7 @@ import { MemoryGraph } from './memory-graph.js';
 import type { MemoryGraphConfig } from './memory-graph.js';
 import { TieredCacheManager } from './cache-manager.js';
 import type { CacheConfig } from './types.js';
+import { TieredMemoryStore } from './tiered-memory.js';
 
 // ===== Types =====
 
@@ -136,6 +137,24 @@ export interface RuntimeConfig {
 
   /** Backend instance to use (if pre-created) */
   backend?: IMemoryBackend;
+
+  /**
+   * Pre-initialized AgentDB instance to use. When provided, the
+   * registry skips its own dynamic-import / initialize cycle and uses
+   * this instance as-is — useful for testing, multi-registry sharing,
+   * and consumers that already hold an AgentDB they want governed by
+   * the registry. Issue #2019 added the regression tests that depend
+   * on this injection point.
+   */
+  agentdb?: unknown;
+
+  /**
+   * `MemoryService` (or compatible) used to back the `nightlyLearner`
+   * controller. When provided, ADR-125 Phase 4 wraps it with
+   * `MemoryConsolidator.runAll()` instead of delegating directly to AgentDB's
+   * `NightlyLearner`. Accepts `any` to avoid a circular import.
+   */
+  memoryService?: any;
 }
 
 /**
@@ -256,6 +275,9 @@ export class ControllerRegistry extends EventEmitter {
             ? result.reason.message
             : String(result.reason);
 
+          // #2432 — close any prior instance before replacing.
+          await this.closePriorIfAny(name);
+
           this.controllers.set(name, {
             name,
             instance: null,
@@ -327,13 +349,20 @@ export class ControllerRegistry extends EventEmitter {
       return entry.instance as T;
     }
 
-    // Fall back to AgentDB internal controllers
-    if (this.agentdb && typeof this.agentdb.getController === 'function') {
-      try {
-        const controller = this.agentdb.getController(name);
-        if (controller) return controller as T;
-      } catch {
-        // Controller not available in AgentDB
+    // Fall back to AgentDB internal controllers. Issue #2019:
+    // probe `agentdb[name]` first so we don't depend on the upstream
+    // getController switch knowing about every field it carries.
+    if (this.agentdb) {
+      const agentdb: any = this.agentdb;
+      const direct = agentdb[name];
+      if (direct) return direct as T;
+      if (typeof agentdb.getController === 'function') {
+        try {
+          const controller = agentdb.getController(name);
+          if (controller) return controller as T;
+        } catch {
+          // Upstream switch threw for an unknown name — fine, fall through.
+        }
       }
     }
 
@@ -347,12 +376,16 @@ export class ControllerRegistry extends EventEmitter {
     const entry = this.controllers.get(name);
     if (entry?.enabled) return true;
 
-    // Check AgentDB internal controllers
-    if (this.agentdb && typeof this.agentdb.getController === 'function') {
-      try {
-        return this.agentdb.getController(name) !== null;
-      } catch {
-        return false;
+    // Issue #2019: same direct-then-fallback shape as get() above.
+    if (this.agentdb) {
+      const agentdb: any = this.agentdb;
+      if (agentdb[name]) return true;
+      if (typeof agentdb.getController === 'function') {
+        try {
+          return agentdb.getController(name) !== null;
+        } catch {
+          return false;
+        }
       }
     }
 
@@ -458,6 +491,14 @@ export class ControllerRegistry extends EventEmitter {
    * Initialize AgentDB instance with dynamic import and fallback chain.
    */
   private async initAgentDB(config: RuntimeConfig): Promise<void> {
+    // Caller-supplied agentdb wins — used by tests (#2019 regression
+    // guards) and by consumers that own the AgentDB lifecycle.
+    if (config.agentdb) {
+      this.agentdb = config.agentdb;
+      this.emit('agentdb:initialized');
+      return;
+    }
+
     try {
       // Validate dbPath to prevent path traversal
       const dbPath = config.dbPath || ':memory:';
@@ -544,7 +585,6 @@ export class ControllerRegistry extends EventEmitter {
       case 'causalRecall':
       case 'learningSystem':
       case 'explainableRecall':
-      case 'nightlyLearner':
       case 'graphTransformer':
       case 'graphAdapter':
       case 'gnnService':
@@ -555,12 +595,23 @@ export class ControllerRegistry extends EventEmitter {
       case 'mmrDiversityRanker':
         return this.agentdb !== null;
 
+      // ADR-125 Phase 4 — nightlyLearner is enabled when EITHER an AgentDB
+      // is present (legacy path) OR a MemoryService is registered (new path
+      // backed by MemoryConsolidator.runAll).
+      case 'nightlyLearner':
+        return this.agentdb !== null || !!this.config.memoryService;
+
       // SemanticRouter — auto-enable if agentdb available (exported since alpha.10)
       case 'semanticRouter':
         return this.agentdb !== null;
 
-      // Optional controllers
+      // ADR-125 Phase 5 — hybridSearch auto-enables when a MemoryService is
+      // registered. Replaces the prior "placeholder, require explicit enable"
+      // posture.
       case 'hybridSearch':
+        return !!this.config.memoryService;
+
+      // Optional controllers
       case 'agentMemoryScope':
       case 'sonaTrajectory':
       case 'federatedSession':
@@ -572,10 +623,44 @@ export class ControllerRegistry extends EventEmitter {
   }
 
   /**
+   * Close any prior controller instance for `name` before it is replaced.
+   *
+   * #2432 fix — pre-fix, `controllers.set(name, ...)` silently orphaned the
+   * prior instance. For backends that allocate native / WASM resources
+   * (notably `SqlJsRvfBackend` which keeps an Emscripten MEMFS file ~11 MB
+   * per `new SQL.Database(buffer)` until `close()` runs), GC'ing the JS
+   * wrapper does NOT reclaim the underlying allocation. A long-running
+   * `mcp start` process that re-init'd controllers hundreds of times grew
+   * external memory by ~36 GB in production over 6 weeks.
+   *
+   * Best-effort close: catch and ignore errors — replacement must proceed
+   * even if the prior instance's close throws (it's already orphaned at
+   * this point either way).
+   */
+  private async closePriorIfAny(name: ControllerName): Promise<void> {
+    const prior = this.controllers.get(name);
+    if (!prior?.instance) return;
+    const inst = prior.instance as { close?: () => unknown; dispose?: () => unknown };
+    try {
+      if (typeof inst.close === 'function') {
+        await inst.close();
+      } else if (typeof inst.dispose === 'function') {
+        await inst.dispose();
+      }
+    } catch {
+      // Best-effort — leak is preferable to crashing init on a replacement.
+    }
+  }
+
+  /**
    * Initialize a single controller with error isolation.
    */
   private async initController(name: ControllerName, level: number): Promise<void> {
     const startTime = performance.now();
+
+    // #2432 — close any prior instance before replacing the map entry,
+    // otherwise its native/WASM resources leak (e.g. sql.js MEMFS files).
+    await this.closePriorIfAny(name);
 
     try {
       const instance = await this.createController(name);
@@ -663,9 +748,109 @@ export class ControllerRegistry extends EventEmitter {
         return cache;
       }
 
-      case 'hybridSearch':
-        // BM25 hybrid search — placeholder for future implementation
-        return null;
+      case 'hybridSearch': {
+        // ADR-125 Phase 5 + ADR-147 P2 — three-arm RRF + MMR hybrid search.
+        // Runs semanticSearch() (dense, with graceful fallback),
+        // searchKeyword() (sparse FTS5), and a per-entity keyword search
+        // (entity arm, gated on extractEntities(query) returning anything)
+        // independently in parallel, fuses via RRF, diversifies via MMR.
+        // Results carry a `signals` field naming which arms surfaced each
+        // entry (provenance for debugging + downstream rerankers).
+        const memSvc = this.config.memoryService;
+        if (!memSvc) return null;
+        const adapter = typeof memSvc.getAdapter === 'function' ? memSvc.getAdapter() : null;
+        if (!adapter) return null;
+
+        const { applyRRF, applyMMR } = await import('./smart-retrieval.js');
+        const { extractEntities } = await import('./entity-tagger.js');
+
+        return {
+          /**
+           * Run a fused hybrid search.
+           * @param query        Free-form query string.
+           * @param opts.limit   Final result count (default 10).
+           * @param opts.fanOutK Per-arm fanout before fusion (default = limit * 3).
+           * @param opts.mmrLambda MMR relevance/diversity balance (default 0.7).
+           */
+          search: async (
+            query: string,
+            opts: { limit?: number; fanOutK?: number; mmrLambda?: number } = {}
+          ) => {
+            const limit = opts.limit ?? 10;
+            const fanOutK = opts.fanOutK ?? Math.max(limit * 3, 20);
+            const mmrLambda = opts.mmrLambda ?? 0.7;
+
+            // Adapt SearchResult[] → SearchCandidate[] expected by RRF
+            const toCands = (results: any[]) =>
+              results.map((r: any) => ({
+                id: r.entry.id,
+                key: r.entry.key,
+                content: r.entry.content,
+                namespace: r.entry.namespace,
+                metadata: r.entry.metadata,
+                createdAt: r.entry.createdAt,
+                updatedAt: r.entry.updatedAt,
+                score: r.score,
+                _entry: r.entry,
+              }));
+
+            // Entity arm — only fire if the query actually contains
+            // extractable entities. Empty arm is dropped from RRF input
+            // so it doesn't dilute the fusion.
+            const entities = extractEntities(query);
+            const entityFanOut = entities.length > 0
+              ? Math.max(1, Math.ceil(fanOutK / entities.length))
+              : 0;
+
+            // Run all three arms in parallel. Per-arm try/catch (via the
+            // .catch(...) tails) keeps one failing backend from blanking
+            // the other arms — the same defensive shape used pre-ADR-147.
+            const [dense, sparse, entityHits] = await Promise.all([
+              adapter.semanticSearch(query, fanOutK).catch(() => [] as any[]),
+              adapter.searchKeyword(query, { k: fanOutK }).catch(() => [] as any[]),
+              entities.length > 0
+                ? Promise.all(
+                    entities.map((e: string) =>
+                      adapter.searchKeyword(e, { k: entityFanOut }).catch(() => [] as any[]),
+                    ),
+                  ).then((perEntity: any[][]) => perEntity.flat())
+                : Promise.resolve([] as any[]),
+            ]);
+
+            const denseCands = toCands(dense);
+            const sparseCands = toCands(sparse);
+            const entityCands = toCands(entityHits);
+
+            // Build signal-provenance sets keyed by candidate id BEFORE
+            // RRF so we can stamp `signals` onto the fused output.
+            const candKey = (c: { id?: string; key?: string; content: string }) =>
+              c.id || c.key || c.content.slice(0, 128);
+            const denseIds = new Set(denseCands.map(candKey));
+            const sparseIds = new Set(sparseCands.map(candKey));
+            const entityIds = new Set(entityCands.map(candKey));
+
+            const arms = [denseCands, sparseCands];
+            if (entityCands.length > 0) arms.push(entityCands);
+
+            const fused = applyRRF(arms, 60);
+            const diverse = applyMMR(fused, mmrLambda, limit);
+
+            return diverse.map((s: any) => {
+              const key = candKey(s.candidate);
+              const signals: ('vector' | 'bm25' | 'entity')[] = [];
+              if (denseIds.has(key)) signals.push('vector');
+              if (sparseIds.has(key)) signals.push('bm25');
+              if (entityIds.has(key)) signals.push('entity');
+              return {
+                entry: s.candidate._entry,
+                score: s.score,
+                signals,
+              };
+            });
+          },
+          source: 'hybrid-rrf-mmr' as const,
+        };
+      }
 
       case 'agentMemoryScope':
         // Agent memory scope — placeholder, activated when explicitly enabled
@@ -792,6 +977,25 @@ export class ControllerRegistry extends EventEmitter {
       }
 
       case 'nightlyLearner': {
+        // ADR-125 Phase 4 — prefer the MemoryConsolidator when a
+        // MemoryService is registered. The consolidator's `runAll()` is the
+        // documented entry point for sweep + dedup + compact and replaces the
+        // thin delegate to AgentDB's NightlyLearner.
+        const memSvc = this.config.memoryService;
+        if (memSvc && typeof memSvc.getConsolidator === 'function') {
+          try {
+            const consolidator = await memSvc.getConsolidator();
+            return {
+              run: () => consolidator.runAll(),
+              runAll: () => consolidator.runAll(),
+              sweepExpired: () => consolidator.sweepExpired(),
+              dedup: (s?: any) => consolidator.dedup(s),
+              compactHnsw: () => consolidator.compactHnsw(),
+              source: 'memory-consolidator' as const,
+            };
+          } catch { /* fall through to AgentDB */ }
+        }
+
         if (!this.agentdb) return null;
         try {
           const agentdbModule: any = await import('agentdb');
@@ -907,13 +1111,30 @@ export class ControllerRegistry extends EventEmitter {
 
       case 'vectorBackend':
       case 'graphAdapter': {
-        // These are accessed via AgentDB internal state, not direct construction
+        // These are accessed via AgentDB internal state, not direct
+        // construction. Issue #2019: agentdb@3.0.0-alpha.14's
+        // `getController()` switch only handles
+        // memory/reflexion/skills/causal/causalGraph and throws
+        // `Unknown controller: vectorBackend` for everything else —
+        // which a try/catch silently swallowed, leaving the controller
+        // permanently `enabled: false` even though the field is right
+        // there on the agentdb instance (`agentdb.vectorBackend` is
+        // assigned in AgentDB.initialize()).
+        //
+        // Prefer the direct-property access. Fall back to
+        // `getController` only if the field is absent — preserves
+        // forward-compat with a future agentdb that wires
+        // vectorBackend / graphAdapter into the switch but stops
+        // exposing them as public fields.
         if (!this.agentdb) return null;
+        const agentdb: any = this.agentdb;
+        const direct = agentdb[name];
+        if (direct) return direct;
         try {
-          if (typeof this.agentdb.getController === 'function') {
-            return this.agentdb.getController(name) ?? null;
+          if (typeof agentdb.getController === 'function') {
+            return agentdb.getController(name) ?? null;
           }
-        } catch { /* fallthrough */ }
+        } catch { /* upstream switch threw for an unknown name */ }
         return null;
       }
 
@@ -972,45 +1193,14 @@ export class ControllerRegistry extends EventEmitter {
   /**
    * Lightweight in-memory tiered store (fallback when HierarchicalMemory
    * cannot be initialized from agentdb).
-   * Enforces per-tier size limits to prevent unbounded memory growth.
+   *
+   * Promoted to the first-class {@link TieredMemoryStore} module, which
+   * adds Zep/Graphiti-style temporal validity (validFrom / validUntil /
+   * supersededBy) while keeping the legacy duck-typed API:
+   * store(key, value, tier) / recall(query, topK) / getTierStats().
    */
-  private createTieredMemoryStub() {
-    const MAX_PER_TIER = 5000;
-    const tiers: Record<string, Map<string, { value: string; ts: number }>> = {
-      working: new Map(),
-      episodic: new Map(),
-      semantic: new Map(),
-    };
-    return {
-      store(key: string, value: string, tier = 'working') {
-        const t = tiers[tier] || tiers.working;
-        // Evict oldest if at capacity
-        if (t.size >= MAX_PER_TIER) {
-          const oldest = t.keys().next().value;
-          if (oldest !== undefined) t.delete(oldest);
-        }
-        t.set(key, { value: value.substring(0, 100_000), ts: Date.now() });
-      },
-      recall(query: string, topK = 5) {
-        const safeTopK = Math.min(Math.max(1, topK), 100);
-        const q = query.toLowerCase().substring(0, 10_000);
-        const results: Array<{ key: string; value: string; tier: string; ts: number }> = [];
-        for (const [tierName, map] of Object.entries(tiers)) {
-          for (const [key, entry] of map) {
-            if (key.toLowerCase().includes(q) || entry.value.toLowerCase().includes(q)) {
-              results.push({ key, value: entry.value, tier: tierName, ts: entry.ts });
-              if (results.length >= safeTopK * 3) break; // Early exit for large stores
-            }
-          }
-        }
-        return results.sort((a, b) => b.ts - a.ts).slice(0, safeTopK);
-      },
-      getTierStats() {
-        return Object.fromEntries(
-          Object.entries(tiers).map(([name, map]) => [name, map.size]),
-        );
-      },
-    };
+  private createTieredMemoryStub(): TieredMemoryStore {
+    return new TieredMemoryStore();
   }
 
   /**

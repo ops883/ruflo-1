@@ -1,11 +1,12 @@
 ---
 name: cron-schedule
 description: Schedule persistent background workers via CronCreate
-allowed-tools: CronCreate CronList CronDelete mcp__claude-flow__hooks_worker-dispatch
+argument-hint: "<worker-name> [--interval CRON]"
+allowed-tools: CronCreate CronList CronDelete mcp__plugin_ruflo-core_ruflo__hooks_worker-dispatch
 ---
 Use `CronCreate` for workers that must survive session restarts:
 
-`CronCreate({ schedule: "*/15 * * * *", prompt: "Run security audit worker via mcp__claude-flow__hooks_worker-dispatch" })`
+`CronCreate({ schedule: "*/15 * * * *", prompt: "Run security audit worker via mcp__plugin_ruflo-core_ruflo__hooks_worker-dispatch" })`
 
 ### Recommended Schedules
 

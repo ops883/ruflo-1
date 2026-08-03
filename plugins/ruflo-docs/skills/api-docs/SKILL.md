@@ -1,7 +1,8 @@
 ---
 name: api-docs
 description: Generate API documentation from source code with JSDoc and OpenAPI support
-allowed-tools: Bash(npx *) mcp__claude-flow__hooks_worker-dispatch Read Write Grep
+argument-hint: "<source-path>"
+allowed-tools: Bash(npx *) mcp__plugin_ruflo-core_ruflo__hooks_worker-dispatch Read Write Grep
 ---
 Generate API documentation from TypeScript/JavaScript source:
 
@@ -10,7 +11,7 @@ Generate API documentation from TypeScript/JavaScript source:
 3. **Generate missing docs**: Add JSDoc for undocumented public APIs
 4. **OpenAPI spec**: For HTTP endpoints, generate OpenAPI 3.0 definitions
 
-Dispatch via MCP: `mcp__claude-flow__hooks_worker-dispatch({ trigger: "document", scope: "api" })`
+Dispatch via MCP: `mcp__plugin_ruflo-core_ruflo__hooks_worker-dispatch({ trigger: "document", scope: "api" })`
 
 Conventions:
 - Every public export must have a JSDoc comment
