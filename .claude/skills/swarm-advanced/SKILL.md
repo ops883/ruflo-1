@@ -968,3 +968,92 @@ mcp__claude-flow__swarm_init({ topology: "mesh", maxAgents: 4 })
 **Last Updated**: 2025-10-19
 **Skill Level**: Advanced
 **Estimated Learning Time**: 2-3 hours
+
+---
+
+## Auto-Start Protocol, Agent Routing & Complexity Detection (migrated from root CLAUDE.md)
+
+> The following was moved out of the root CLAUDE.md's "Swarm Protocols & Routing" section. It uses the Task-tool + SendMessage named-agent pattern (see `agent-teams-comms`) rather than this skill's `mcp__claude-flow__*` tool calls, and documents the specific auto-start trigger conditions, the anti-drift agent-routing code table, and task-complexity thresholds not covered elsewhere in this skill.
+
+### Auto-Start Swarm Protocol
+
+When the user requests a complex task (multi-file changes, feature implementation, refactoring), **immediately execute this pattern in a SINGLE message:**
+
+```javascript
+// STEP 1: Initialize swarm coordination via MCP
+mcp__ruv-swarm__swarm_init({
+  topology: "hierarchical",
+  maxAgents: 8,
+  strategy: "specialized"
+})
+
+// STEP 2: Spawn NAMED agents concurrently — all in ONE message
+// Each agent knows WHO to message next in the pipeline
+Task({
+  prompt: "Research requirements and codebase. SendMessage findings to 'architect' when done.",
+  subagent_type: "researcher", name: "researcher", run_in_background: true
+})
+Task({
+  prompt: "Wait for research from 'researcher'. Design implementation. SendMessage design to 'coder'.",
+  subagent_type: "system-architect", name: "architect", run_in_background: true
+})
+Task({
+  prompt: "Wait for design from 'architect'. Implement the solution. SendMessage code paths to 'tester'.",
+  subagent_type: "coder", name: "coder", run_in_background: true
+})
+Task({
+  prompt: "Wait for implementation from 'coder'. Write tests. SendMessage results to 'reviewer'.",
+  subagent_type: "tester", name: "tester", run_in_background: true
+})
+Task({
+  prompt: "Wait for test results from 'tester'. Review code quality and security. Report findings.",
+  subagent_type: "reviewer", name: "reviewer", run_in_background: true
+})
+
+// STEP 3: Kick off the pipeline
+SendMessage({ to: "researcher", summary: "Start research", message: "[task description and context]" })
+
+// STEP 4: Batch todos
+TodoWrite({ todos: [
+  {content: "Research and analyze requirements", status: "in_progress", activeForm: "Researching"},
+  {content: "Design architecture", status: "pending", activeForm: "Designing"},
+  {content: "Implement solution", status: "pending", activeForm: "Implementing"},
+  {content: "Write tests", status: "pending", activeForm: "Testing"},
+  {content: "Review and finalize", status: "pending", activeForm: "Reviewing"}
+]})
+
+// Pipeline flow via SendMessage:
+// researcher ──→ architect ──→ coder ──→ tester ──→ reviewer
+```
+
+### Agent Routing (Anti-Drift)
+
+| Code | Task | Agents |
+|------|------|--------|
+| 1 | Bug Fix | coordinator, researcher, coder, tester |
+| 3 | Feature | coordinator, architect, coder, tester, reviewer |
+| 5 | Refactor | coordinator, architect, coder, reviewer |
+| 7 | Performance | coordinator, perf-engineer, coder |
+| 9 | Security | coordinator, security-architect, auditor |
+| 11 | Memory | coordinator, memory-specialist, perf-engineer |
+| 13 | Docs | researcher, api-docs |
+
+**Codes 1-11: hierarchical/specialized (anti-drift). Code 13: mesh/balanced**
+
+### Task Complexity Detection
+
+**AUTO-INVOKE SWARM when task involves:**
+- Multiple files (3+)
+- New feature implementation
+- Refactoring across modules
+- API changes with tests
+- Security-related changes
+- Performance optimization
+- Database schema changes
+
+**SKIP SWARM for:**
+- Single file edits
+- Simple bug fixes (1-2 lines)
+- Documentation updates
+- Configuration changes
+- Quick questions/exploration
