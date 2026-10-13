@@ -65,22 +65,22 @@ npx ruflo eject --name my-harness                # lift ruflo project → standa
 npx ruflo doctor --component metaharness         # report metaharness availability + version
 
 # MCP tools (callable by Claude Code agents)
-mcp__claude-flow__metaharness_score
-mcp__claude-flow__metaharness_genome
-mcp__claude-flow__metaharness_mcp_scan
-mcp__claude-flow__metaharness_threat_model
-mcp__claude-flow__metaharness_oia_audit
-mcp__claude-flow__metaharness_audit_list
-mcp__claude-flow__metaharness_audit_trend
-mcp__claude-flow__metaharness_similarity          # iter 36 — ADR-152 §3.1 genome similarity
-mcp__claude-flow__metaharness_drift_from_history  # iter 53 — 1-command drift detection
-mcp__claude-flow__metaharness_bench               # ADR-153 — create/verify bench suites for evolve --bench
-mcp__claude-flow__metaharness_evolve              # MAP-Elites driver — evolve a harness across bench suites
-mcp__claude-flow__metaharness_security_bench      # security-focused benchmark suite gate
-mcp__claude-flow__metaharness_redblue             # @metaharness/redblue — adversarial red/blue LLM testing (init|run|patch|attack|report)
-mcp__claude-flow__metaharness_learn               # metaharness@0.3.0 — GEPA learning run ($0 dry-run default; run=true to spend)
-mcp__claude-flow__metaharness_gepa                # darwin@0.8.0 — GEPA genome ops (genome|validate|render|analyze); gepaOptimize stays library-only
-mcp__claude-flow__metaharness_flywheel            # ADR-322 — evaluate concurrently, inspect receipts/ledger, or explicitly promote
+mcp__plugin_ruflo-core_ruflo__metaharness_score
+mcp__plugin_ruflo-core_ruflo__metaharness_genome
+mcp__plugin_ruflo-core_ruflo__metaharness_mcp_scan
+mcp__plugin_ruflo-core_ruflo__metaharness_threat_model
+mcp__plugin_ruflo-core_ruflo__metaharness_oia_audit
+mcp__plugin_ruflo-core_ruflo__metaharness_audit_list
+mcp__plugin_ruflo-core_ruflo__metaharness_audit_trend
+mcp__plugin_ruflo-core_ruflo__metaharness_similarity          # iter 36 — ADR-152 §3.1 genome similarity
+mcp__plugin_ruflo-core_ruflo__metaharness_drift_from_history  # iter 53 — 1-command drift detection
+mcp__plugin_ruflo-core_ruflo__metaharness_bench               # ADR-153 — create/verify bench suites for evolve --bench
+mcp__plugin_ruflo-core_ruflo__metaharness_evolve              # MAP-Elites driver — evolve a harness across bench suites
+mcp__plugin_ruflo-core_ruflo__metaharness_security_bench      # security-focused benchmark suite gate
+mcp__plugin_ruflo-core_ruflo__metaharness_redblue             # @metaharness/redblue — adversarial red/blue LLM testing (init|run|patch|attack|report)
+mcp__plugin_ruflo-core_ruflo__metaharness_learn               # metaharness@0.3.0 — GEPA learning run ($0 dry-run default; run=true to spend)
+mcp__plugin_ruflo-core_ruflo__metaharness_gepa                # darwin@0.8.0 — GEPA genome ops (genome|validate|render|analyze); gepaOptimize stays library-only
+mcp__plugin_ruflo-core_ruflo__metaharness_flywheel            # ADR-322 — evaluate concurrently, inspect receipts/ledger, or explicitly promote
 ```
 
 ### Routing integration (ADR-148/149)

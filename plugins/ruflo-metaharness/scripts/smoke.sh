@@ -30,6 +30,9 @@ EXPECTED_IN_PROCESS_TOOLS=1 # ADR-322 metaharness_flywheel
 CLAUDE_DOCS="$(mktemp)"
 trap 'rm -f "$CLAUDE_DOCS"' EXIT
 cat "$ROOT/../../CLAUDE.md" "$ROOT/CLAUDE.md" > "$CLAUDE_DOCS" 2>/dev/null
+# Tools appear as the standalone server prefix in the root CLAUDE.md and as the
+# ruflo-core plugin prefix inside plugin bundles (see audit-plugin-mcp-prefix.mjs).
+MCP_PREFIX_RE='mcp__(claude-flow|plugin_ruflo-core_ruflo)__'
 : "${EXPECTED_TOOLS:=0}"
 : "${EXPECTED_SUBS:=0}"
 
@@ -850,7 +853,7 @@ COUNT=0
 for t in $TOOLS; do
   COUNT=$((COUNT + 1))
   # audit-allow: standalone-mcp-prefix — this checks the repository CLAUDE.md, not a plugin skill.
-  grep -q "mcp__claude-flow__${t}" "$CMD" 2>/dev/null \
+  grep -qE "${MCP_PREFIX_RE}${t}" "$CMD" 2>/dev/null \
     || miss="$miss ${t}-not-in-claude-md"
 done
 # Count derived from the wrapper source (mint deliberately excluded — see
@@ -1593,7 +1596,7 @@ grep -q "baselineSince" "$WRAPPER" 2>/dev/null || miss="$miss no-baseline-since-
 # CLAUDE.md mentions both surfaces
 CMD="$CLAUDE_DOCS"
 # audit-allow: standalone-mcp-prefix — this checks the repository CLAUDE.md, not a plugin skill.
-grep -q "mcp__claude-flow__metaharness_drift_from_history" "$CMD" 2>/dev/null || miss="$miss claude-md-no-mcp"
+grep -qE "${MCP_PREFIX_RE}metaharness_drift_from_history" "$CMD" 2>/dev/null || miss="$miss claude-md-no-mcp"
 grep -q "ruflo metaharness drift-from-history" "$CMD" 2>/dev/null || miss="$miss claude-md-no-subcommand"
 # Phase 4 includes the new positive-case assertions
 T="$ROOT/scripts/test-mcp-tools.mjs"
@@ -1880,7 +1883,7 @@ grep -q "Distance alert gate exits 1" "$F" 2>/dev/null || miss="$miss no-alert-s
 # CLAUDE.md documents the new MCP tool + subcommand
 CMD="$CLAUDE_DOCS"
 # audit-allow: standalone-mcp-prefix — this checks the repository CLAUDE.md, not a plugin skill.
-grep -q "mcp__claude-flow__metaharness_similarity" "$CMD" 2>/dev/null || miss="$miss claude-md-no-mcp-tool"
+grep -qE "${MCP_PREFIX_RE}metaharness_similarity" "$CMD" 2>/dev/null || miss="$miss claude-md-no-mcp-tool"
 grep -q "ruflo metaharness similarity" "$CMD" 2>/dev/null || miss="$miss claude-md-no-subcommand"
 grep -q -- "--alert-on-distance-below" "$CMD" 2>/dev/null || miss="$miss claude-md-no-distance-flag"
 [[ -z "$miss" ]] && ok || bad "$miss"
@@ -2198,7 +2201,7 @@ grep -q "no-metaharness-smoke.yml" "$F" || miss="$miss no-ci-gate-ref"
 # Command surface + tool surface enumerated
 grep -q "npx ruflo metaharness score" "$F" || miss="$miss no-cli-example"
 # audit-allow: standalone-mcp-prefix — this checks the repository CLAUDE.md, not a plugin skill.
-grep -q "mcp__claude-flow__metaharness_" "$F" || miss="$miss no-mcp-tool-list"
+grep -qE "${MCP_PREFIX_RE}metaharness_" "$F" || miss="$miss no-mcp-tool-list"
 # Routing + parallel-log integration both mentioned
 grep -q "CLAUDE_FLOW_ROUTER_NEURAL\|CLAUDE_FLOW_ROUTER_PARALLEL_LOG" "$F" || miss="$miss no-routing-flags"
 # 3-criteria gate
