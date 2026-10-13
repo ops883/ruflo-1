@@ -22,6 +22,14 @@ SUBS_SRC="$ROOT/../../v3/@claude-flow/cli/src/commands/metaharness.ts"
 EXPECTED_TOOLS=$(grep -cE "name: 'metaharness_" "$TOOLS_SRC" 2>/dev/null; true)
 EXPECTED_SUBS=$(grep -cE "^[[:space:]]+'?[a-z-]+'?:[[:space:]]*'[a-z-]+\.mjs'" "$SUBS_SRC" 2>/dev/null; true)
 EXPECTED_IN_PROCESS_TOOLS=1 # ADR-322 metaharness_flywheel
+
+# Agent-facing docs corpus. Commit 610502c (2026-08-10) moved the MetaHarness
+# command surface out of the root CLAUDE.md into the plugin-scoped
+# plugins/ruflo-metaharness/CLAUDE.md to keep always-loaded context small.
+# Documentation checks below accept either location.
+CLAUDE_DOCS="$(mktemp)"
+trap 'rm -f "$CLAUDE_DOCS"' EXIT
+cat "$ROOT/../../CLAUDE.md" "$ROOT/CLAUDE.md" > "$CLAUDE_DOCS" 2>/dev/null
 : "${EXPECTED_TOOLS:=0}"
 : "${EXPECTED_SUBS:=0}"
 
@@ -814,7 +822,7 @@ miss=""
 # SUBCOMMANDS map should appear as `npx ruflo metaharness <X>` for
 # discoverability.
 DISP="$ROOT/../../v3/@claude-flow/cli/src/commands/metaharness.ts"
-CMD="$ROOT/../../CLAUDE.md"
+CMD="$CLAUDE_DOCS"
 # Extract SUBCOMMANDS keys (both quoted + unquoted forms).
 # BSD sed (macOS) doesn't recognize \s; use [ \t] for portability.
 KEYS=$(grep -E "^[ 	]+('?[a-z-]+'?):[ 	]*'[a-z-]+\.mjs'" "$DISP" 2>/dev/null \
@@ -835,7 +843,7 @@ miss=""
 # agents browsing the catalog discover it. If a future iter adds a tool
 # but forgets the CLAUDE.md update, the tool exists but is invisible.
 WRAPPER="$ROOT/../../v3/@claude-flow/cli/src/mcp-tools/metaharness-tools.ts"
-CMD="$ROOT/../../CLAUDE.md"
+CMD="$CLAUDE_DOCS"
 TOOLS=$(grep -oE "name: 'metaharness_[a-z_]+'" "$WRAPPER" 2>/dev/null \
   | sed -E "s/name: '([a-z_]+)'/\1/" | sort -u)
 COUNT=0
@@ -1167,7 +1175,7 @@ WRAPPER="$ROOT/../../v3/@claude-flow/cli/src/mcp-tools/metaharness-tools.ts"
 grep -q "alertOnNewSeverity:" "$WRAPPER" 2>/dev/null || miss="$miss no-mcp-input"
 grep -q "args.push('--alert-on-new-severity'" "$WRAPPER" 2>/dev/null || miss="$miss no-mcp-dispatch"
 # CLAUDE.md surfaces the flag
-CMD="$ROOT/../../CLAUDE.md"
+CMD="$CLAUDE_DOCS"
 grep -q -- "--alert-on-new-severity" "$CMD" 2>/dev/null || miss="$miss no-claude-md"
 # Runtime end-to-end: --alert-on-new-severity info on real baseline fires
 # (real ruflo audit has 1 INFO finding; baseline file with no findings → introduced=1)
@@ -1345,7 +1353,7 @@ grep -q "file:\${ARGS.baselineFile}" "$F" 2>/dev/null || miss="$miss no-file-pre
 # audit-trend uses --baseline (file) not --baseline-key in fast-fast-path
 grep -q "'--baseline', ARGS.baselineFile" "$F" 2>/dev/null || miss="$miss no-baseline-file-passthrough"
 # CLAUDE.md mentions it
-CMD="$ROOT/../../CLAUDE.md"
+CMD="$CLAUDE_DOCS"
 grep -q -- "--baseline-file <path>" "$CMD" 2>/dev/null || miss="$miss claude-md-no-flag"
 [[ -z "$miss" ]] && ok || bad "$miss"
 
@@ -1361,7 +1369,7 @@ grep -q "ARGS.baselineKey" "$F" 2>/dev/null || miss="$miss no-baseline-key-branc
 # Synthesized listResult so downstream code doesn't break
 grep -q "records: \[{ key: ARGS.baselineKey" "$F" 2>/dev/null || miss="$miss no-synthetic-record"
 # CLAUDE.md surfaces the flag
-CMD="$ROOT/../../CLAUDE.md"
+CMD="$CLAUDE_DOCS"
 grep -q -- "--baseline-key <key>" "$CMD" 2>/dev/null || miss="$miss claude-md-no-flag"
 [[ -z "$miss" ]] && ok || bad "$miss"
 
@@ -1583,7 +1591,7 @@ grep -q "name: 'metaharness_drift_from_history'" "$WRAPPER" 2>/dev/null || miss=
 grep -q "drift-from-history.mjs" "$WRAPPER" 2>/dev/null || miss="$miss no-script-dispatch"
 grep -q "baselineSince" "$WRAPPER" 2>/dev/null || miss="$miss no-baseline-since-input"
 # CLAUDE.md mentions both surfaces
-CMD="$ROOT/../../CLAUDE.md"
+CMD="$CLAUDE_DOCS"
 # audit-allow: standalone-mcp-prefix — this checks the repository CLAUDE.md, not a plugin skill.
 grep -q "mcp__claude-flow__metaharness_drift_from_history" "$CMD" 2>/dev/null || miss="$miss claude-md-no-mcp"
 grep -q "ruflo metaharness drift-from-history" "$CMD" 2>/dev/null || miss="$miss claude-md-no-subcommand"
@@ -1870,7 +1878,7 @@ grep -q "audit-trend structural-distance integration" "$F" 2>/dev/null || miss="
 grep -q "Graceful fallback when fingerprint missing" "$F" 2>/dev/null || miss="$miss no-fallback-step"
 grep -q "Distance alert gate exits 1" "$F" 2>/dev/null || miss="$miss no-alert-step"
 # CLAUDE.md documents the new MCP tool + subcommand
-CMD="$ROOT/../../CLAUDE.md"
+CMD="$CLAUDE_DOCS"
 # audit-allow: standalone-mcp-prefix — this checks the repository CLAUDE.md, not a plugin skill.
 grep -q "mcp__claude-flow__metaharness_similarity" "$CMD" 2>/dev/null || miss="$miss claude-md-no-mcp-tool"
 grep -q "ruflo metaharness similarity" "$CMD" 2>/dev/null || miss="$miss claude-md-no-subcommand"
@@ -2179,7 +2187,7 @@ grep -q "SKIPPED" "$F" || miss="$miss no-skip-doc"
 [[ -z "$miss" ]] && ok || bad "$miss"
 
 step "17n. CLAUDE.md documents MetaHarness integration (ADR-150 discoverability — iter 22)"
-F="$ROOT/../../CLAUDE.md"
+F="$CLAUDE_DOCS"
 miss=""
 [[ -f "$F" ]] || miss="$miss claude-md-missing"
 grep -q "^## MetaHarness Integration (ADR-150)" "$F" || miss="$miss no-section-header"
