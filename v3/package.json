@@ -55,8 +55,9 @@
     "semantic-release": "25.0.2"
   },
   "overrides": {
-    "handlebars": ">=4.7.9",
-    "protobufjs": ">=8.6.0"
+    "handlebars": ">=4.7.10",
+    "protobufjs": ">=8.6.0",
+    "proxy-addr": ">=2.0.8"
   },
   "pnpm": {
     "neverBuiltDependencies": [
